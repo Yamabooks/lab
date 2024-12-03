@@ -1,0 +1,5 @@
+2024-11-08 14:13:31,868|WARNING:[animation.py:1037                 save() ] MovieWriter imagemagick unavailable; using Pillow instead.
+2024-11-08 14:16:10,773|WARNING:[animation.py:1037                 save() ] MovieWriter imagemagick unavailable; using Pillow instead.
+2024-11-08 14:16:32,922|WARNING:[animation.py:1037                 save() ] MovieWriter imagemagick unavailable; using Pillow instead.
+2024-11-08 14:22:54,255|WARNING:[animation.py:1037                 save() ] MovieWriter imagemagick unavailable; using Pillow instead.
+2024-11-08 14:27:15,378|WARNING:[animation.py:1037                 save() ] MovieWriter imagemagick unavailable; using Pillow instead.
