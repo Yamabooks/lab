@@ -1,0 +1,15 @@
+numpy>=1.19
+toml>=0.10
+numba>=0.51
+scipy>=1.5
+
+[dev]
+black
+jupyter
+
+[plot]
+matplotlib
+
+[test]
+pylint
+pytest
