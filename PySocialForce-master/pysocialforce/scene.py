@@ -8,18 +8,26 @@ from pysocialforce.utils import stateutils
 # 歩行者の状態を管理
 class PedState:
     """歩行者の位置、速度、目標地点、およびグループ情報を追跡"""
-    
+
     def __init__(self, state, types, groups, scene_configs):
+        """
+        state: 初期状態（各歩行者の位置、速度、目標地点など）を保持するnumpy配列。
+        types: 各歩行者のタイプ（0: 成人、1: 老人、2: 子供）。
+        groups: 歩行者のグループ情報（例: [[0, 1], [2]]）。
+        scene_configs: タイプ別のシーン設定を格納した辞書。
+        """
         self.types = types
         self.scene_configs = scene_configs
 
         self.ped_states = []
         self.group_states = []
+        self.update(state, groups)
 
+    def update(self, state, groups):
         # タイプごとの初期化処理
         self.state = state
         self.groups = groups
-        self.agent_settings = self.initialize_agent_settings()
+        self.agent_settings = self.initialize_agent_settings()  # 各歩行者の設定を適応
 
     def initialize_agent_settings(self):
         """タイプごとにシーン設定を適用"""
@@ -31,11 +39,12 @@ class PedState:
                 "step_width": config("step_width", 1.0),
                 "max_speed_multiplier": config("max_speed_multiplier", 1.3),
                 "tau": config("tau", 0.5)
-            })
+            })  # 辞書形式でリストに保存
         return settings
 
     @property
     def state(self):
+        """歩行者の状態を取得・設定"""
         return self._state
 
     @state.setter
@@ -48,24 +57,29 @@ class PedState:
             self._state = np.concatenate((state, taus), axis=-1)
         else:
             self._state = state
-        self.ped_states.append(self._state.copy())
+        self.ped_states.append(self._state.copy())  # 状態履歴（ped_states）に現在の状態を追加して保存
         
     def get_states(self):
+        """現在までの全ての状態履歴（ped_states）とグループ履歴（group_states）を取得"""
         return np.stack(self.ped_states), self.group_states
 
     def size(self) -> int:
         return self.state.shape[0]
 
     def pos(self) -> np.ndarray:
+        """各歩行者の現在の位置（px, py）を返す"""
         return self.state[:, 0:2]
 
     def vel(self) -> np.ndarray:
+        """各歩行者の現在の速度（vx, vy）を返す"""
         return self.state[:, 2:4]
 
     def goal(self) -> np.ndarray:
+        """各歩行者の目標地点（gx, gy）を返す"""
         return self.state[:, 4:6]
 
     def tau(self):
+        """各歩行者のリラクゼーション時間（tau）を返す"""
         return self.state[:, 6:7]
 
     def speeds(self):
@@ -73,14 +87,12 @@ class PedState:
         return stateutils.speeds(self.state)
 
     def step(self, force, groups=None):
-        """Move peds according to forces"""
-        # desired velocity
-        desired_velocity = self.vel() + self.step_width * force
-        desired_velocity = self.capped_velocity(desired_velocity, self.max_speeds)
-        # stop when arrived
-        desired_velocity[stateutils.desired_directions(self.state)[1] < 0.5] = [0, 0]
+        """外部から与えられる力（force）に基づいて、歩行者の次の位置と速度を計算"""
+        desired_velocity = self.vel() + self.step_width * force  # 理想速度の計算
+        desired_velocity = self.capped_velocity(desired_velocity, self.max_speeds)  # 速度の制限(最大速度を超えないようcapped_velocityを使用して調整)
+        desired_velocity[stateutils.desired_directions(self.state)[1] < 0.5] = [0, 0]   # 目標到達時の速度制限
 
-        # update state
+        # 状態更新
         next_state = self.state
         next_state[:, 0:2] += desired_velocity * self.step_width
         next_state[:, 2:4] = desired_velocity
@@ -93,11 +105,12 @@ class PedState:
     #     return stateutils.speeds(self.ped_states[0])
 
     def desired_directions(self):
+        """各歩行者が目標地点に向かう方向ベクトルを返す"""
         return stateutils.desired_directions(self.state)[0]
 
     @staticmethod
     def capped_velocity(desired_velocity, max_velocity):
-        """Scale down a desired velocity to its capped speed."""
+        """速度が最大速度を超えないようにスケーリング"""
         desired_speeds = np.linalg.norm(desired_velocity, axis=-1)
         factor = np.minimum(1.0, max_velocity / desired_speeds)
         factor[desired_speeds == 0] = 0.0
@@ -133,17 +146,17 @@ class EnvState:
     """State of the environment obstacles"""
 
     def __init__(self, obstacles, resolution=10):
-        self.resolution = resolution
-        self.obstacles = obstacles
+        self.resolution = resolution   # 線分のサンプリング分解能
+        self.obstacles = obstacles  # 障害物（線分）のリスト
 
     @property
     def obstacles(self) -> List[np.ndarray]:
-        """obstacles is a list of np.ndarray"""
+        """障害物のリストを取得・設定"""
         return self._obstacles
 
     @obstacles.setter
     def obstacles(self, obstacles):
-        """Input an list of (startx, endx, starty, endy) as start and end of a line"""
+        """各障害物線分を細分化し、サンプル点のリストとして保存"""
         if obstacles is None:
             self._obstacles = []
         else:
