@@ -15,8 +15,10 @@ if __name__ == "__main__":
             # [3.0, 0.0, 0.0, 0.5, 4.0, 10.0],
         ]
     )
+    # age type
+    types = [0,1,0,]    # 0: adult, 1: elderly, 2: child(未実装)
     # social groups informoation is represented as lists of indices of the state array
-    groups = [[1, 0], [2]]
+    groups = [[0, 1], [2]] # 括弧内がグループ
     # list of linear obstacles given in the form of (x_min, x_max, y_min, y_max)
     # obs = [[-1, -1, -1, 11], [3, 3, -1, 11]]
     obs = [[1, 2, 7, 8]]
@@ -24,12 +26,13 @@ if __name__ == "__main__":
     # initiate the simulator,
     s = psf.Simulator(
         initial_state,
+        types=types,
         groups=groups,
         obstacles=obs,
         config_file=Path(__file__).resolve().parent.joinpath("main.toml"),
     )
     # update 80 steps
-    s.step(50)
+    s.step(120)
 
     with psf.plot.SceneVisualizer(s, "output/animation") as sv:
         sv.animate()

@@ -5,27 +5,34 @@ import numpy as np
 
 from pysocialforce.utils import stateutils
 
-
+# 歩行者の状態を管理
 class PedState:
-    """Tracks the state of pedstrains and social groups"""
-
-    def __init__(self, state, groups, config):
-        self.default_tau = config("tau", 0.5)
-        self.step_width = config("step_width", 0.4)
-        self.agent_radius = config("agent_radius", 0.35)
-        self.max_speed_multiplier = config("max_speed_multiplier", 1.3)
-
-        self.max_speeds = None
-        self.initial_speeds = None
+    """歩行者の位置、速度、目標地点、およびグループ情報を追跡"""
+    
+    def __init__(self, state, types, groups, scene_configs):
+        self.types = types
+        self.scene_configs = scene_configs
 
         self.ped_states = []
         self.group_states = []
 
-        self.update(state, groups)
-
-    def update(self, state, groups):
+        # タイプごとの初期化処理
         self.state = state
         self.groups = groups
+        self.agent_settings = self.initialize_agent_settings()
+
+    def initialize_agent_settings(self):
+        """タイプごとにシーン設定を適用"""
+        settings = []
+        for i, ped_type in enumerate(self.types):
+            config = self.scene_configs[ped_type]
+            settings.append({
+                "agent_radius": config("agent_radius", 0.35),
+                "step_width": config("step_width", 1.0),
+                "max_speed_multiplier": config("max_speed_multiplier", 1.3),
+                "tau": config("tau", 0.5)
+            })
+        return settings
 
     @property
     def state(self):
@@ -33,16 +40,16 @@ class PedState:
 
     @state.setter
     def state(self, state):
-        tau = self.default_tau * np.ones(state.shape[0])
+        """タイプ別に `tau` を拡張"""
         if state.shape[1] < 7:
-            self._state = np.concatenate((state, np.expand_dims(tau, -1)), axis=-1)
+            taus = np.full((state.shape[0], 1), 0.5)    # stateの行列にtauの列を追加する   
+            #taus = np.expand_dims(np.array(self.default_tau), -1)
+
+            self._state = np.concatenate((state, taus), axis=-1)
         else:
             self._state = state
-        if self.initial_speeds is None:
-            self.initial_speeds = self.speeds()
-        self.max_speeds = self.max_speed_multiplier * self.initial_speeds
         self.ped_states.append(self._state.copy())
-
+        
     def get_states(self):
         return np.stack(self.ped_states), self.group_states
 
@@ -121,7 +128,7 @@ class PedState:
                 return i
         return -1
 
-
+# 環境状態、障害物を管理
 class EnvState:
     """State of the environment obstacles"""
 

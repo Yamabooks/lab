@@ -18,7 +18,7 @@ if __name__ == "__main__":
     )
     type = [0,1,2,0,1,2]    # 0: 成人, 1: 老人, 2: 子供
     # social groups informoation is represented as lists of indices of the state array
-    groups = [[1], [0], [2], [3], [4], [5]]
+    groups = [[0], [1], [2], [3], [4], [5]]
     # list of linear obstacles given in the form of (x_min, x_max, y_min, y_max)
     # obs = [[-1, -1, -1, 11], [3, 3, -1, 11]]
     obs = [[-1, 1, 7, 7],[2, 4, 4, 4]]
