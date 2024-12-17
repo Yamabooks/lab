@@ -18,22 +18,22 @@ def camel_to_snake(camel_case_string):
 class Force(ABC):
     """Force base class"""
 
-    def __init__(self):
+    def __init__(self): # initより先に呼び出す
         super().__init__()
-        self.scene = None
-        self.peds = None
-        self.factor = 1.0
-        self.config = Config()
+        self.scene = None   # シーン情報
+        self.peds = None    # 歩行者状態
+        self.factor = 1.0   # 力の係数(設定ファイルから取得)
+        self.config = Config()  # 設定を格納
 
     def init(self, scene, config):
         """Load config and scene"""
-        # load the sub field corresponding to the force name from global confgi file
+        # 設定ファイルから各力のパラメータを取得
         self.config = config.sub_config(camel_to_snake(type(self).__name__))
         if self.config:
             self.factor = self.config("factor", 1.0)
 
-        self.scene = scene
-        self.peds = self.scene.peds
+        self.scene = scene  # シーン情報
+        self.peds = self.scene.peds # 歩行者情報
 
     @abstractmethod
     def _get_force(self) -> np.ndarray:
@@ -66,31 +66,42 @@ class GoalAttractiveForce(Force):
 
 class PedRepulsiveForce(Force):
     """Ped to ped repulsive force"""
+    def __init__(self, config):
+        super().__init__()
+        self.v0 = config("v0", 2.1)
+        self.sigma = config("sigma", 0.3)
+        self.fov_phi = config("fov_phi", 100.0)
+        self.fov_factor = config("fov_factor", 0.5)
 
     def _get_force(self):
-        potential_func = PedPedPotential(
-            self.peds.step_width, v0=self.config("v0"), sigma=self.config("sigma"),
-        )
+        potential_func = PedPedPotential(self.peds.step_width, v0=self.v0, sigma=self.sigma)
         f_ab = -1.0 * potential_func.grad_r_ab(self.peds.state)
 
-        fov = FieldOfView(phi=self.config("fov_phi"), out_of_view_factor=self.config("fov_factor"),)
+        fov = FieldOfView(phi=self.fov_phi, out_of_view_factor=self.fov_factor)
         w = np.expand_dims(fov(self.peds.desired_directions(), -f_ab), -1)
         F_ab = w * f_ab
+
         return np.sum(F_ab, axis=1) * self.factor
 
 
 class SpaceRepulsiveForce(Force):
     """obstacles to ped repulsive force"""
+    def __init__(self, config):
+        super().__init__()
+        self.v0 = config("v0", 2.1)
+        self.sigma = config("sigma", 0.3)
+        self.fov_phi = config("fov_phi", 100.0)
+        self.fov_factor = config("fov_factor", 0.5)
 
     def _get_force(self):
-        if self.scene.get_obstacles() is None:
-            F_aB = np.zeros((self.peds.size(), 0, 2))
-        else:
-            potential_func = PedSpacePotential(
-                self.scene.get_obstacles(), u0=self.config("u0"), r=self.config("r")
-            )
-            F_aB = -1.0 * potential_func.grad_r_aB(self.peds.state)
-        return np.sum(F_aB, axis=1) * self.factor
+        potential_func = PedPedPotential(self.peds.step_width, v0=self.v0, sigma=self.sigma)
+        f_ab = -1.0 * potential_func.grad_r_ab(self.peds.state)
+
+        fov = FieldOfView(phi=self.fov_phi, out_of_view_factor=self.fov_factor)
+        w = np.expand_dims(fov(self.peds.desired_directions(), -f_ab), -1)
+        F_ab = w * f_ab
+
+        return np.sum(F_ab, axis=1) * self.factor
 
 
 class GroupCoherenceForce(Force):
@@ -231,21 +242,24 @@ class DesiredForce(Force):
     selected.
     :return: the calculated force
     """
+    def __init__(self, config):
+        super().__init__()
+        self.relaxation_time = config("relaxation_time", 0.5)
+        self.goal_threshold = config("goal_threshold", 0.2)
 
     def _get_force(self):
-        relexation_time = self.config("relaxation_time", 0.5)
-        goal_threshold = self.config("goal_threshold", 0.1)
         pos = self.peds.pos()
         vel = self.peds.vel()
         goal = self.peds.goal()
         direction, dist = stateutils.normalize(goal - pos)
         force = np.zeros((self.peds.size(), 2))
-        force[dist > goal_threshold] = (
+        # 目標地点に向かう力を計算
+        force[dist > self.goal_threshold] = (
             direction * self.peds.max_speeds.reshape((-1, 1)) - vel.reshape((-1, 2))
-        )[dist > goal_threshold, :]
-        force[dist <= goal_threshold] = -1.0 * vel[dist <= goal_threshold]
-        force /= relexation_time
-        return force * self.factor
+        )[dist > self.goal_threshold, :]
+        force[dist <= self.goal_threshold] = -1.0 * vel[dist <= self.goal_threshold]
+        
+        return force / self.relaxation_time * self.factor
 
 
 class SocialForce(Force):
@@ -258,40 +272,31 @@ class SocialForce(Force):
     fine.
     :return:  nx2 ndarray the calculated force
     """
+    def __init__(self, config):
+        super().__init__()
+        self.lambda_importance = config("lambda_importance", 2.0)
+        self.gamma = config("gamma", 0.35)
+        self.n = config("n", 2)
+        self.n_prime = config("n_prime", 3)
 
     def _get_force(self):
-        lambda_importance = self.config("lambda_importance", 2.0)
-        gamma = self.config("gamma", 0.35)
-        n = self.config("n", 2)
-        n_prime = self.config("n_prime", 3)
-
-        pos_diff = stateutils.each_diff(self.peds.pos())  # n*(n-1)x2 other - self
+        pos_diff = stateutils.each_diff(self.peds.pos())
         diff_direction, diff_length = stateutils.normalize(pos_diff)
-        vel_diff = -1.0 * stateutils.each_diff(self.peds.vel())  # n*(n-1)x2 self - other
+        vel_diff = -1.0 * stateutils.each_diff(self.peds.vel())
 
-        # compute interaction direction t_ij
-        interaction_vec = lambda_importance * vel_diff + diff_direction
+        # 相互作用方向
+        interaction_vec = self.lambda_importance * vel_diff + diff_direction
         interaction_direction, interaction_length = stateutils.normalize(interaction_vec)
 
-        # compute angle theta (between interaction and position difference vector)
-        theta = stateutils.vector_angles(interaction_direction) - stateutils.vector_angles(
-            diff_direction
-        )
-        # compute model parameter B = gamma * ||D||
-        B = gamma * interaction_length
+        theta = stateutils.vector_angles(interaction_direction) - stateutils.vector_angles(diff_direction)
+        B = self.gamma * interaction_length
 
-        force_velocity_amount = np.exp(-1.0 * diff_length / B - np.square(n_prime * B * theta))
-        force_angle_amount = -np.sign(theta) * np.exp(
-            -1.0 * diff_length / B - np.square(n * B * theta)
-        )
-        force_velocity = force_velocity_amount.reshape(-1, 1) * interaction_direction
-        force_angle = force_angle_amount.reshape(-1, 1) * stateutils.left_normal(
-            interaction_direction
-        )
+        # 力の計算
+        force_velocity = np.exp(-diff_length / B - (self.n_prime * B * theta) ** 2).reshape(-1, 1) * interaction_direction
+        force_angle = -np.sign(theta).reshape(-1, 1) * np.exp(-diff_length / B - (self.n * B * theta) ** 2) * stateutils.left_normal(interaction_direction)
+        force = force_velocity + force_angle
 
-        force = force_velocity + force_angle  # n*(n-1) x 2
-        force = np.sum(force.reshape((self.peds.size(), -1, 2)), axis=1)
-        return force * self.factor
+        return np.sum(force.reshape((self.peds.size(), -1, 2)), axis=1) * self.factor
 
 
 class ObstacleForce(Force):
@@ -300,12 +305,16 @@ class ObstacleForce(Force):
     :return:  the calculated force
     """
 
+    def __init__(self, config):
+        super().__init__()
+        self.sigma = config("sigma", 0.2)
+        self.threshold = config("threshold", 3.0)
+
     def _get_force(self):
-        sigma = self.config("sigma", 0.2)
-        threshold = self.config("threshold", 0.2) + self.peds.agent_radius
         force = np.zeros((self.peds.size(), 2))
         if len(self.scene.get_obstacles()) == 0:
             return force
+
         obstacles = np.vstack(self.scene.get_obstacles())
         pos = self.peds.pos()
 
@@ -313,10 +322,8 @@ class ObstacleForce(Force):
             diff = p - obstacles
             directions, dist = stateutils.normalize(diff)
             dist = dist - self.peds.agent_radius
-            if np.all(dist >= threshold):
-                continue
-            dist_mask = dist < threshold
-            directions[dist_mask] *= np.exp(-dist[dist_mask].reshape(-1, 1) / sigma)
-            force[i] = np.sum(directions[dist_mask], axis=0)
+            mask = dist < self.threshold
+            directions[mask] *= np.exp(-dist[mask].reshape(-1, 1) / self.sigma)
+            force[i] = np.sum(directions[mask], axis=0)
 
         return force * self.factor

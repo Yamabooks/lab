@@ -19,28 +19,38 @@ class PedState:
         self.types = types
         self.scene_configs = scene_configs
 
+        agent_settings = self.initialize_agent_settings()  # 各歩行者の設定を適応
+
+        self.max_speeds = None
+        self.initial_speeds = None
+
         self.ped_states = []
         self.group_states = []
-        self.update(state, groups)
-
-    def update(self, state, groups):
-        # タイプごとの初期化処理
-        self.state = state
-        self.groups = groups
-        self.agent_settings = self.initialize_agent_settings()  # 各歩行者の設定を適応
+        self.update(state, groups, agent_settings)
 
     def initialize_agent_settings(self):
         """タイプごとにシーン設定を適用"""
         settings = []
         for i, ped_type in enumerate(self.types):
             config = self.scene_configs[ped_type]
+            self.type_tau = config("tau", 0.5)
+            self.step_width = config("step_width", 1.0)
+            self.agent_radius = config("agent_radius", 0.35)
+            self.max_speed_multiplier = config("max_speed_multiplier", 1.3)
+            
             settings.append({
-                "agent_radius": config("agent_radius", 0.35),
-                "step_width": config("step_width", 1.0),
-                "max_speed_multiplier": config("max_speed_multiplier", 1.3),
-                "tau": config("tau", 0.5)
+                self.type_tau,
+                self.step_width,
+                self.agent_radius,
+                self.max_speed_multiplier,
             })  # 辞書形式でリストに保存
         return settings
+
+    def update(self, state, groups, agent_setting):
+        # タイプごとの初期化処理
+        self.state = state
+        self.groups = groups
+        self.agent_settings = agent_setting  # 各歩行者の設定を適応
 
     @property
     def state(self):
@@ -57,6 +67,10 @@ class PedState:
             self._state = np.concatenate((state, taus), axis=-1)
         else:
             self._state = state
+        if self.initial_speeds is None:
+            self.initial_speeds = self.speeds()
+        self.max_speeds = self.max_speed_multiplier * self.initial_speeds
+
         self.ped_states.append(self._state.copy())  # 状態履歴（ped_states）に現在の状態を追加して保存
         
     def get_states(self):
@@ -145,7 +159,7 @@ class PedState:
 class EnvState:
     """State of the environment obstacles"""
 
-    def __init__(self, obstacles, resolution=10):
+    def __init__(self, obstacles, resolution=50):
         self.resolution = resolution   # 線分のサンプリング分解能
         self.obstacles = obstacles  # 障害物（線分）のリスト
 

@@ -31,7 +31,7 @@ if __name__ == "__main__":
         obstacles=obs,
         config_file=Path(__file__).resolve().parent.joinpath("main.toml"),
     )
-    # update 80 steps
+    
     s.step(120)
 
     with psf.plot.SceneVisualizer(s, "output/animation") as sv:

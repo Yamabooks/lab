@@ -42,7 +42,7 @@ class Simulator:
         self.config = DefaultConfig()
         if config_file:
             self.config.load_config(config_file)
-        #self.scene_config = self.config.sub_config("scene")
+        self.group_config = self.config.sub_config("scene")
 
         # typeごとの設定を保持
         self.types = types # 0: adult, 1: elderly, 2: child
@@ -58,19 +58,56 @@ class Simulator:
         # initiate agents
         self.peds = PedState(state, types, groups, self.scene_configs)
 
+        print("peds:", self.peds)  # pedsオブジェクト全体
+        print("Current State:", self.peds.state)  # 歩行者の状態（位置、速度、目標など）
+        print("Positions:", self.peds.pos())  # 歩行者の位置
+        print("Velocities:", self.peds.vel())  # 歩行者の速度
+        print("Goals:", self.peds.goal())  # 歩行者の目標地点
+        print("Tau:", self.peds.tau())  # 歩行者のリラクゼーション時間
+        print("Groups:", self.peds.groups)  # 歩行者のグループ情報
+
         # construct forces
         self.forces = self.make_forces()
 
     def make_forces(self):
-        """Construct forces"""
+        """Construct forces for each pedestrian type and include group forces if enabled."""
         force_list = []
+
+        # 歩行者ごとの力を追加
         for i, ped_type in enumerate(self.types):
             type_force_config = self.force_configs[ped_type]
-            force_list.append(forces.DesiredForce(type_force_config))
-            force_list.append(forces.PedRepulsiveForce(type_force_config))
-            force_list.append(forces.SpaceRepulsiveForce(type_force_config))
+
+            # 個別の力 (5つ) をタイプ別設定で初期化
+            force_list += [
+                forces.DesiredForce(type_force_config),
+                forces.SocialForce(type_force_config),
+                forces.ObstacleForce(type_force_config),
+                forces.PedRepulsiveForce(type_force_config),
+                forces.SpaceRepulsiveForce(type_force_config),
+            ]
+        print("Force list after adding individual forces:", force_list)
+
+        # グループ関連の力を有効化する場合
+        if self.config("scene", {}).get("enable_group", False):
+            group_force_config = self.config  # グループ力は全体設定を利用
+            group_forces = [
+                forces.GroupCoherenceForceAlt(),
+                forces.GroupRepulsiveForce(),
+                forces.GroupGazeForceAlt(),
+            ]
+            # グループ力に対して初期化を行う
+            for group_force in group_forces:
+                group_force.init(self, group_force_config)
+            force_list += group_forces  # グループ力を全体の力に追加
+
+        print("Force list after adding group forces:", force_list)
+
+        # 全ての力を初期化 (シーン情報と設定を渡す)
+        for force in force_list:
+            force.init(self, self.config)
 
         return force_list
+
 
     def compute_forces(self):
         """compute forces"""
