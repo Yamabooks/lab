@@ -43,7 +43,7 @@ class Force(ABC):
         raise NotImplementedError
 
     def get_force(self, debug=False):
-        force = self._get_force()
+        force = self._get_force()   # 現在のインスタンスの _get_force を呼び出す
         if debug:
             logger.debug(f"{camel_to_snake(type(self).__name__)}:\n {repr(force)}")
         return force
@@ -280,24 +280,30 @@ class SocialForce(Force):
         self.n_prime = config("n_prime", 3)
 
     def _get_force(self):
-        pos_diff = stateutils.each_diff(self.peds.pos())
-        diff_direction, diff_length = stateutils.normalize(pos_diff)
-        vel_diff = -1.0 * stateutils.each_diff(self.peds.vel())
+        pos_diff = stateutils.each_diff(self.peds.pos())    # 歩行者間の位置差ベクトル
+        diff_direction, diff_length = stateutils.normalize(pos_diff)    # 正規化された方向ベクトル、歩行者間の距離
+        vel_diff = -1.0 * stateutils.each_diff(self.peds.vel()) # 歩行者間の速度差ベクトル
 
         # 相互作用方向
-        interaction_vec = self.lambda_importance * vel_diff + diff_direction
-        interaction_direction, interaction_length = stateutils.normalize(interaction_vec)
+        interaction_vec = self.lambda_importance * vel_diff + diff_direction    # 速度差と位置さを組み合わせた相互作用方向ベクトル
+        interaction_direction, interaction_length = stateutils.normalize(interaction_vec)   # 相互作用ベクトルの正規化方向、相互作用ベクトルの大きさ(スカラー値)
 
-        theta = stateutils.vector_angles(interaction_direction) - stateutils.vector_angles(diff_direction)
-        B = self.gamma * interaction_length
+        theta = stateutils.vector_angles(interaction_direction) - stateutils.vector_angles(diff_direction)  # 相互作用方向と位置差の方向の角度差(歩行者がどの程度別の方向を向いているか)
+        B = self.gamma * interaction_length # 相互作用の減衰係数(距離を基づいて力を調整)
 
         # 力の計算
-        force_velocity = np.exp(-diff_length / B - (self.n_prime * B * theta) ** 2).reshape(-1, 1) * interaction_direction
-        force_angle = -np.sign(theta).reshape(-1, 1) * np.exp(-diff_length / B - (self.n * B * theta) ** 2) * stateutils.left_normal(interaction_direction)
-        force = force_velocity + force_angle
+        force_velocity_amount = np.exp(-1.0 * diff_length / B - np.square(self.n_prime * B * theta))
+        force_angle_amount = -np.sign(theta) * np.exp(
+            -1.0 * diff_length / B - np.square(self.n * B * theta)
+        )
+        force_velocity = force_velocity_amount.reshape(-1, 1) * interaction_direction
+        force_angle = force_angle_amount.reshape(-1, 1) * stateutils.left_normal(
+            interaction_direction
+        )
 
-        return np.sum(force.reshape((self.peds.size(), -1, 2)), axis=1) * self.factor
-
+        force = force_velocity + force_angle  # n*(n-1) x 2
+        force = np.sum(force.reshape((self.peds.size(), -1, 2)), axis=1)
+        return force * self.factor
 
 class ObstacleForce(Force):
     """Calculates the force between this agent and the nearest obstacle in this

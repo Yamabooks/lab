@@ -8,6 +8,7 @@ from pysocialforce.utils import DefaultConfig
 from pysocialforce.scene import PedState, EnvState
 from pysocialforce import forces
 
+import json
 
 class Simulator:
     """Simulate social force model.
@@ -42,18 +43,17 @@ class Simulator:
         self.config = DefaultConfig()
         if config_file:
             self.config.load_config(config_file)
-        self.group_config = self.config.sub_config("scene")
 
+        print("Config内容:", vars(self.config))  # オブジェクトの属性を表示
+            
         # typeごとの設定を保持
         self.types = types # 0: adult, 1: elderly, 2: child
 
-        # シーン設定の読み込み
-        # setで重複を削除しユニークなタイプの集合を作成([0,1,0,1]→[0,1])
-        self.scene_configs = {t: self.config.sub_config(f"types.{t}.scene") for t in set(self.types)}
-        self.force_configs = {t: self.config.sub_config(f"types.{t}.forces") for t in set(self.types)}
+        self.scene_configs = self.get_scene_configs(types, self.config)
+        print("\nscene_configs: ", json.dumps(self.scene_configs, indent=4))
 
         # initiate obstacles
-        self.env = EnvState(obstacles, self.config("resolution", 10.0))
+        self.env = EnvState(obstacles, self.config("resolution", 50.0))
 
         # initiate agents
         self.peds = PedState(state, types, groups, self.scene_configs)
@@ -69,6 +69,15 @@ class Simulator:
         # construct forces
         self.forces = self.make_forces()
 
+    # configからtypeとsceneを抽出し、辞書を構築
+    def get_scene_configs(self, types, config):
+        scene_configs = {}
+        # setで種類の数だけ実行([0,1,0,2] → [0,1,2])
+        for i in set(types):
+            type_config = config.sub_config("types").sub_config(f"{i}").sub_config("scene").config  # typeに対応するsceneを抽出
+            scene_configs[str(i)] = {"scene": type_config}  # typeを追加し結果に追加           
+        return scene_configs
+
     def make_forces(self):
         """Construct forces for each pedestrian type and include group forces if enabled."""
         force_list = []
@@ -82,10 +91,10 @@ class Simulator:
                 forces.DesiredForce(type_force_config),
                 forces.SocialForce(type_force_config),
                 forces.ObstacleForce(type_force_config),
-                forces.PedRepulsiveForce(type_force_config),
-                forces.SpaceRepulsiveForce(type_force_config),
+                #forces.PedRepulsiveForce(type_force_config),
+                #forces.SpaceRepulsiveForce(type_force_config),
             ]
-        print("Force list after adding individual forces:", force_list)
+        print("Force list:", force_list)
 
         # グループ関連の力を有効化する場合
         if self.config("scene", {}).get("enable_group", False):

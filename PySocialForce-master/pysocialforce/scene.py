@@ -19,14 +19,12 @@ class PedState:
         self.types = types
         self.scene_configs = scene_configs
 
-        agent_settings = self.initialize_agent_settings()  # 各歩行者の設定を適応
-
         self.max_speeds = None
         self.initial_speeds = None
 
         self.ped_states = []
         self.group_states = []
-        self.update(state, groups, agent_settings)
+        self.update(state, groups)
 
     def initialize_agent_settings(self):
         """タイプごとにシーン設定を適用"""
@@ -46,12 +44,12 @@ class PedState:
             })  # 辞書形式でリストに保存
         return settings
 
-    def update(self, state, groups, agent_setting):
+    def update(self, state, groups):
         # タイプごとの初期化処理
+        self.agent_settings = self.initialize_agent_settings() # 各歩行者の設定を適応
         self.state = state
         self.groups = groups
-        self.agent_settings = agent_setting  # 各歩行者の設定を適応
-
+        
     @property
     def state(self):
         """歩行者の状態を取得・設定"""
@@ -115,8 +113,8 @@ class PedState:
             next_groups = groups
         self.update(next_state, next_groups)
 
-    # def initial_speeds(self):
-    #     return stateutils.speeds(self.ped_states[0])
+    def initial_speeds(self):
+         return stateutils.speeds(self.ped_states[0])
 
     def desired_directions(self):
         """各歩行者が目標地点に向かう方向ベクトルを返す"""
