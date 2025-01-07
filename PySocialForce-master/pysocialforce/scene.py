@@ -24,17 +24,21 @@ class PedState:
 
         self.ped_states = []
         self.group_states = []
+
+        self.agent_settings = self.initialize_agent_settings() # 各歩行者の設定を適応
+        
         self.update(state, groups)
 
     def initialize_agent_settings(self):
         """タイプごとにシーン設定を適用"""
         settings = []
         for i, ped_type in enumerate(self.types):
-            config = self.scene_configs[ped_type]
-            self.type_tau = config("tau", 0.5)
-            self.step_width = config("step_width", 1.0)
-            self.agent_radius = config("agent_radius", 0.35)
-            self.max_speed_multiplier = config("max_speed_multiplier", 1.3)
+            config = (self.scene_configs[f"{ped_type}"])["scene"]
+
+            self.type_tau = config["tau"]
+            self.step_width = config["step_width"]
+            self.agent_radius = config["agent_radius"]
+            self.max_speed_multiplier = config["max_speed_multiplier"]
             
             settings.append({
                 self.type_tau,
@@ -46,7 +50,6 @@ class PedState:
 
     def update(self, state, groups):
         # タイプごとの初期化処理
-        self.agent_settings = self.initialize_agent_settings() # 各歩行者の設定を適応
         self.state = state
         self.groups = groups
         
@@ -157,7 +160,7 @@ class PedState:
 class EnvState:
     """State of the environment obstacles"""
 
-    def __init__(self, obstacles, resolution=50):
+    def __init__(self, obstacles, resolution):
         self.resolution = resolution   # 線分のサンプリング分解能
         self.obstacles = obstacles  # 障害物（線分）のリスト
 

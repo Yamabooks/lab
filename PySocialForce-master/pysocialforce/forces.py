@@ -8,6 +8,7 @@ from pysocialforce.potentials import PedPedPotential, PedSpacePotential
 from pysocialforce.fieldofview import FieldOfView
 from pysocialforce.utils import Config, stateutils, logger
 
+import json
 
 def camel_to_snake(camel_case_string):
     """Convert CamelCase to snake_case"""
@@ -20,20 +21,24 @@ class Force(ABC):
 
     def __init__(self): # initより先に呼び出す
         super().__init__()
-        self.scene = None   # シーン情報
-        self.peds = None    # 歩行者状態
-        self.factor = 1.0   # 力の係数(設定ファイルから取得)
-        self.config = Config()  # 設定を格納
-
-    def init(self, scene, config):
+        self.scene = None  # シーン情報（歩行者や障害物の情報など）
+        self.peds = None  # 歩行者情報
+        self.factors = {}  # 種類ごとの係数を保持（例: {"0": 1.0, "1": 0.8}）
+        self.configs = {}  # 種類ごとの設定を保持
+    
+    def init(self, scene, configs_by_type):
         """Load config and scene"""
         # 設定ファイルから各力のパラメータを取得
-        self.config = config.sub_config(camel_to_snake(type(self).__name__))
-        if self.config:
-            self.factor = self.config("factor", 1.0)
+        self.scene = scene
+        self.peds = self.scene.peds
+        
+        # 種類ごとの設定を保存
+        for ped_type, config in configs_by_type.items():
+            self.configs[ped_type] = config  # 各種類の設定を保持
+            self.factors[ped_type] = config.get("factor", 1.0)  # 各種類の係数を保存
+            print("ped_type, config: ", ped_type," 、", config)
+            print("factor: ", self.factors[ped_type])
 
-        self.scene = scene  # シーン情報
-        self.peds = self.scene.peds # 歩行者情報
 
     @abstractmethod
     def _get_force(self) -> np.ndarray:
@@ -43,10 +48,12 @@ class Force(ABC):
         raise NotImplementedError
 
     def get_force(self, debug=False):
-        force = self._get_force()   # 現在のインスタンスの _get_force を呼び出す
+        forces = np.zeros((self.peds.size(), 2))
+        for i, ped_type in enumerate(self.peds.types):
+            forces[i] = self._get_force(ped_type, i) * self.factors.get(ped_type, 1.0)
         if debug:
-            logger.debug(f"{camel_to_snake(type(self).__name__)}:\n {repr(force)}")
-        return force
+            logger.debug(f"{camel_to_snake(type(self).__name__)}:\n {repr(forces)}")
+        return forces
 
 
 class GoalAttractiveForce(Force):
@@ -237,99 +244,98 @@ class GroupGazeForceAlt(Force):
 
 
 class DesiredForce(Force):
-    """Calculates the force between this agent and the next assigned waypoint.
-    If the waypoint has been reached, the next waypoint in the list will be
-    selected.
-    :return: the calculated force
-    """
-    def __init__(self, config):
-        super().__init__()
-        self.relaxation_time = config("relaxation_time", 0.5)
-        self.goal_threshold = config("goal_threshold", 0.2)
+    """Calculates the force between this agent and the next assigned waypoint."""
 
-    def _get_force(self):
+    def _get_force(self, ped_type, index):
+        config = self.configs.get(ped_type, {})
+        relaxation_time = config.get("relaxation_time", 0.5)
+        goal_threshold = config.get("goal_threshold", 0.2)
+
         pos = self.peds.pos()
         vel = self.peds.vel()
         goal = self.peds.goal()
         direction, dist = stateutils.normalize(goal - pos)
-        force = np.zeros((self.peds.size(), 2))
-        # 目標地点に向かう力を計算
-        force[dist > self.goal_threshold] = (
-            direction * self.peds.max_speeds.reshape((-1, 1)) - vel.reshape((-1, 2))
-        )[dist > self.goal_threshold, :]
-        force[dist <= self.goal_threshold] = -1.0 * vel[dist <= self.goal_threshold]
-        
-        return force / self.relaxation_time * self.factor
 
+        # 力を計算
+        force = np.zeros((2,))
+        if dist[index] > goal_threshold:
+            force = (
+                direction[index] * self.peds.max_speeds[index] - vel[index]
+            ) / relaxation_time
+        else:
+            force = -vel[index] / relaxation_time
+
+        return force
 
 class SocialForce(Force):
-    """Calculates the social force between this agent and all the other agents
-    belonging to the same scene.
-    It iterates over all agents inside the scene, has therefore the complexity
-    O(N^2). A better
-    agent storing structure in Tscene would fix this. But for small (less than
-    10000 agents) scenarios, this is just
-    fine.
-    :return:  nx2 ndarray the calculated force
-    """
-    def __init__(self, config):
-        super().__init__()
-        self.lambda_importance = config("lambda_importance", 2.0)
-        self.gamma = config("gamma", 0.35)
-        self.n = config("n", 2)
-        self.n_prime = config("n_prime", 3)
+    """Calculates the social force between this agent and all the other agents."""
 
-    def _get_force(self):
-        pos_diff = stateutils.each_diff(self.peds.pos())    # 歩行者間の位置差ベクトル
-        diff_direction, diff_length = stateutils.normalize(pos_diff)    # 正規化された方向ベクトル、歩行者間の距離
-        vel_diff = -1.0 * stateutils.each_diff(self.peds.vel()) # 歩行者間の速度差ベクトル
+    def _get_force(self, ped_type, index):
+        # 種類に応じた設定を取得
+        config = self.configs.get(ped_type, {})
+        lambda_importance = config.get("lambda_importance", 2.0)
+        gamma = config.get("gamma", 0.35)
+        n = config.get("n", 2)
+        n_prime = config.get("n_prime", 3)
 
-        # 相互作用方向
-        interaction_vec = self.lambda_importance * vel_diff + diff_direction    # 速度差と位置さを組み合わせた相互作用方向ベクトル
-        interaction_direction, interaction_length = stateutils.normalize(interaction_vec)   # 相互作用ベクトルの正規化方向、相互作用ベクトルの大きさ(スカラー値)
+        # 歩行者間の相互作用を計算
+        pos_diff = stateutils.each_diff(self.peds.pos())  # 位置差
+        diff_direction, diff_length = stateutils.normalize(pos_diff)  # 正規化方向と距離
+        vel_diff = -1.0 * stateutils.each_diff(self.peds.vel())  # 速度差
 
-        theta = stateutils.vector_angles(interaction_direction) - stateutils.vector_angles(diff_direction)  # 相互作用方向と位置差の方向の角度差(歩行者がどの程度別の方向を向いているか)
-        B = self.gamma * interaction_length # 相互作用の減衰係数(距離を基づいて力を調整)
+        # 相互作用方向を計算
+        interaction_vec = lambda_importance * vel_diff + diff_direction
+        interaction_direction, interaction_length = stateutils.normalize(interaction_vec)
+
+        # 角度とモデルパラメータを計算
+        theta = stateutils.vector_angles(interaction_direction) - stateutils.vector_angles(
+            diff_direction
+        )
+        B = gamma * interaction_length
 
         # 力の計算
-        force_velocity_amount = np.exp(-1.0 * diff_length / B - np.square(self.n_prime * B * theta))
+        force_velocity_amount = np.exp(-1.0 * diff_length / B - np.square(n_prime * B * theta))
         force_angle_amount = -np.sign(theta) * np.exp(
-            -1.0 * diff_length / B - np.square(self.n * B * theta)
+            -1.0 * diff_length / B - np.square(n * B * theta)
         )
         force_velocity = force_velocity_amount.reshape(-1, 1) * interaction_direction
         force_angle = force_angle_amount.reshape(-1, 1) * stateutils.left_normal(
             interaction_direction
         )
 
-        force = force_velocity + force_angle  # n*(n-1) x 2
+        # 個々の歩行者に作用する力を抽出
+        force = force_velocity + force_angle
         force = np.sum(force.reshape((self.peds.size(), -1, 2)), axis=1)
-        return force * self.factor
+
+        return force[index]
 
 class ObstacleForce(Force):
-    """Calculates the force between this agent and the nearest obstacle in this
-    scene.
-    :return:  the calculated force
-    """
+    """Calculates the force between this agent and the nearest obstacle in this scene."""
 
-    def __init__(self, config):
-        super().__init__()
-        self.sigma = config("sigma", 0.2)
-        self.threshold = config("threshold", 3.0)
+    def _get_force(self, ped_type, index):
+        # 種類に応じた設定を取得
+        config = self.configs.get(ped_type, {})
+        sigma = config.get("sigma", 0.2)
+        threshold = config.get("threshold", 3.0)
 
-    def _get_force(self):
-        force = np.zeros((self.peds.size(), 2))
+        # 初期化
+        force = np.zeros((2,))
         if len(self.scene.get_obstacles()) == 0:
             return force
 
-        obstacles = np.vstack(self.scene.get_obstacles())
-        pos = self.peds.pos()
+        # 障害物と歩行者の位置を計算
+        obstacles = np.vstack(self.scene.get_obstacles())  # 障害物の全座標
+        pos = self.peds.pos()[index]  # 現在の歩行者の位置
 
-        for i, p in enumerate(pos):
-            diff = p - obstacles
-            directions, dist = stateutils.normalize(diff)
-            dist = dist - self.peds.agent_radius
-            mask = dist < self.threshold
-            directions[mask] *= np.exp(-dist[mask].reshape(-1, 1) / self.sigma)
-            force[i] = np.sum(directions[mask], axis=0)
+        # 各障害物への距離と方向を計算
+        diff = pos - obstacles
+        directions, dist = stateutils.normalize(diff)
+        dist -= self.peds.agent_radius  # 障害物との距離からエージェントの半径を引く
 
-        return force * self.factor
+        # 距離が閾値より小さい障害物にのみ影響を与える
+        mask = dist < threshold
+        if np.any(mask):
+            directions[mask] *= np.exp(-dist[mask].reshape(-1, 1) / sigma)
+            force = np.sum(directions[mask], axis=0)
+
+        return force
