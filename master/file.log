@@ -1,1 +1,10 @@
 2024-12-03 17:55:17,599|WARNING:[animation.py:1037                 save() ] MovieWriter imagemagick unavailable; using Pillow instead.
+2025-01-10 05:11:49,304|WARNING:[animation.py:1037                 save() ] MovieWriter imagemagick unavailable; using Pillow instead.
+2025-01-10 05:12:53,826|WARNING:[animation.py:1037                 save() ] MovieWriter imagemagick unavailable; using Pillow instead.
+2025-01-10 05:24:52,504|WARNING:[animation.py:1037                 save() ] MovieWriter imagemagick unavailable; using Pillow instead.
+2025-01-10 05:27:35,172|WARNING:[animation.py:1037                 save() ] MovieWriter imagemagick unavailable; using Pillow instead.
+2025-01-10 05:32:49,325|WARNING:[animation.py:1037                 save() ] MovieWriter imagemagick unavailable; using Pillow instead.
+2025-01-10 05:35:43,029|WARNING:[animation.py:1037                 save() ] MovieWriter imagemagick unavailable; using Pillow instead.
+2025-01-10 05:39:22,649|WARNING:[animation.py:1037                 save() ] MovieWriter imagemagick unavailable; using Pillow instead.
+2025-01-10 05:52:10,245|WARNING:[animation.py:1037                 save() ] MovieWriter imagemagick unavailable; using Pillow instead.
+2025-01-10 05:54:20,499|WARNING:[animation.py:1037                 save() ] MovieWriter imagemagick unavailable; using Pillow instead.

@@ -34,7 +34,7 @@ if __name__ == "__main__":
         config_file=Path(__file__).resolve().parent.joinpath("main.toml"),
     )
     
-    s.step(120)
+    s.step(1)
 
     with psf.plot.SceneVisualizer(s, "output/animation") as sv:
         sv.animate()

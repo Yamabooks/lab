@@ -32,7 +32,8 @@ if __name__ == "__main__":
         config_file=Path(__file__).resolve().parent.joinpath("main.toml"),
     )
     # update 80 steps
-    s.step(120)
+    s.step(1)
+    #s.step(120)
 
     output_folder = Path("outexample")
     output_folder.mkdir(parents=True, exist_ok=True)  # フォルダが存在しない場合は作成

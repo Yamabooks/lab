@@ -18,6 +18,7 @@ class PedState:
         """
         self.types = types
         self.scene_configs = scene_configs
+        print("scene: ", self.scene_configs)
 
         self.max_speeds = None
         self.initial_speeds = None
@@ -25,13 +26,17 @@ class PedState:
         self.ped_states = []
         self.group_states = []
 
-        self.agent_settings = self.initialize_agent_settings() # 各歩行者の設定を適応
+        #self.agent_settings = self.initialize_agent_settings() # 各歩行者の設定を適応
         
+        # TODO:タイプによるmax_speed_multiplierの変化の実装
+        self.max_speed_multiplier = self.scene_configs.get('0', {}).get('scene', {}).get('max_speed_multiplier', 1.3)
+
         self.update(state, groups)
 
     def initialize_agent_settings(self):
         """タイプごとにシーン設定を適用"""
         settings = []
+        print("scene: ", self.scene_configs)
         for i, ped_type in enumerate(self.types):
             config = (self.scene_configs[f"{ped_type}"])["scene"]
 
@@ -77,6 +82,9 @@ class PedState:
     def get_states(self):
         """現在までの全ての状態履歴（ped_states）とグループ履歴（group_states）を取得"""
         return np.stack(self.ped_states), self.group_states
+    
+    def get_agent_radius(self, ped_type):
+        return self.scene_configs[str(ped_type)]["scene"]["agent_radius"]
 
     def size(self) -> int:
         return self.state.shape[0]
@@ -103,10 +111,28 @@ class PedState:
 
     def step(self, force, groups=None):
         """外部から与えられる力（force）に基づいて、歩行者の次の位置と速度を計算"""
-        desired_velocity = self.vel() + self.step_width * force  # 理想速度の計算
-        desired_velocity = self.capped_velocity(desired_velocity, self.max_speeds)  # 速度の制限(最大速度を超えないようcapped_velocityを使用して調整)
-        desired_velocity[stateutils.desired_directions(self.state)[1] < 0.5] = [0, 0]   # 目標到達時の速度制限
+        desired_velocity = np.zeros_like(self.vel())  # 歩行者ごとの速度を保持
+        
+        for i, ped_type in enumerate(self.types):  # 各歩行者の種類に基づいて計算
+            # 種類ごとの設定を取得
+            settings = self.scene_configs.get(str(ped_type))
+            step_width = settings.get("scene").get("step_width")
+            max_speed = settings.get("scene").get("max_speed_multiplier") * self.initial_speeds[i]
 
+            # 理想速度を計算
+            velocity = self.vel()[i] + step_width * force[i]
+            desired_velocity[i] = velocity
+        
+        desired_velocity = self.capped_velocity(desired_velocity, max_speed)
+        print("desired_velocity: ", desired_velocity)
+
+        directions = stateutils.desired_directions(self.state)
+        print(f"Directions: {directions}")
+
+        # 目標到達時の速度制限
+        if stateutils.desired_directions(self.state)[i, 1] < 0.5:
+                desired_velocity = np.array([0, 0])
+        
         # 状態更新
         next_state = self.state
         next_state[:, 0:2] += desired_velocity * self.step_width
@@ -117,7 +143,7 @@ class PedState:
         self.update(next_state, next_groups)
 
     def initial_speeds(self):
-         return stateutils.speeds(self.ped_states[0])
+        return stateutils.speeds(self.ped_states[0])
 
     def desired_directions(self):
         """各歩行者が目標地点に向かう方向ベクトルを返す"""
@@ -128,6 +154,11 @@ class PedState:
         """速度が最大速度を超えないようにスケーリング"""
         desired_speeds = np.linalg.norm(desired_velocity, axis=-1)
         factor = np.minimum(1.0, max_velocity / desired_speeds)
+
+        # factorがスカラーの場合は配列に変換
+        #if np.isscalar(factor):
+            #factor = np.array([factor])
+
         factor[desired_speeds == 0] = 0.0
         return desired_velocity * np.expand_dims(factor, -1)
 

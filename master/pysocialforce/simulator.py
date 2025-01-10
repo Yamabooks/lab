@@ -62,8 +62,8 @@ class Simulator:
             forces.DesiredForce(),
             forces.SocialForce(),
             forces.ObstacleForce(),
-            forces.PedRepulsiveForce(),
-            forces.SpaceRepulsiveForce(),
+            #forces.PedRepulsiveForce(),
+            #forces.SpaceRepulsiveForce(),
         ]
         group_forces = [
             forces.GroupCoherenceForceAlt(),
@@ -81,6 +81,7 @@ class Simulator:
 
     def compute_forces(self):
         """compute forces"""
+        print("Total_force: ",sum(map(lambda x: x.get_force(), self.forces)))
         return sum(map(lambda x: x.get_force(), self.forces))
 
     def get_states(self):

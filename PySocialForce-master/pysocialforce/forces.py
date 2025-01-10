@@ -23,22 +23,21 @@ class Force(ABC):
         super().__init__()
         self.scene = None  # シーン情報（歩行者や障害物の情報など）
         self.peds = None  # 歩行者情報
-        self.factors = {}  # 種類ごとの係数を保持（例: {"0": 1.0, "1": 0.8}）
-        self.configs = {}  # 種類ごとの設定を保持
+        self.config = {}  # 種類ごとの設定を保持
     
-    def init(self, scene, configs_by_type):
+    def init(self, scene, config, factor_list):
         """Load config and scene"""
         # 設定ファイルから各力のパラメータを取得
         self.scene = scene
         self.peds = self.scene.peds
+        self.config = config
+        self.factor_list = factor_list
         
         # 種類ごとの設定を保存
-        for ped_type, config in configs_by_type.items():
-            self.configs[ped_type] = config  # 各種類の設定を保持
-            self.factors[ped_type] = config.get("factor", 1.0)  # 各種類の係数を保存
-            print("ped_type, config: ", ped_type," 、", config)
-            print("factor: ", self.factors[ped_type])
-
+        #for ped_type, config in configs_by_type.items():
+            #self.configs[ped_type] = config  # 各種類の設定を保持
+            #self.factors[ped_type] = config.get("factor", 1.0)  # 各種類の係数を保存
+            #print("ped_type, config: ", ped_type," 、", self.configs)
 
     @abstractmethod
     def _get_force(self) -> np.ndarray:
@@ -48,11 +47,15 @@ class Force(ABC):
         raise NotImplementedError
 
     def get_force(self, debug=False):
+        print("name: ", camel_to_snake(type(self).__name__))
         forces = np.zeros((self.peds.size(), 2))
         for i, ped_type in enumerate(self.peds.types):
-            forces[i] = self._get_force(ped_type, i) * self.factors.get(ped_type, 1.0)
+            forces[i] = self._get_force(ped_type, i) * self.factor_list.get(str(ped_type), 1.0).get(camel_to_snake(type(self).__name__))
+            print("i , ped_type : ", i," , ", ped_type)
         if debug:
             logger.debug(f"{camel_to_snake(type(self).__name__)}:\n {repr(forces)}")
+        print("value: ", self.factor_list.get(str(ped_type), 1.0).get(camel_to_snake(type(self).__name__)))
+        print(f"{type(self).__name__} Forces:\n{forces}")
         return forces
 
 
@@ -247,7 +250,7 @@ class DesiredForce(Force):
     """Calculates the force between this agent and the next assigned waypoint."""
 
     def _get_force(self, ped_type, index):
-        config = self.configs.get(ped_type, {})
+        config = self.config.get(str(ped_type)).get(camel_to_snake(type(self).__name__))
         relaxation_time = config.get("relaxation_time", 0.5)
         goal_threshold = config.get("goal_threshold", 0.2)
 
@@ -272,7 +275,7 @@ class SocialForce(Force):
 
     def _get_force(self, ped_type, index):
         # 種類に応じた設定を取得
-        config = self.configs.get(ped_type, {})
+        config = self.config.get(str(ped_type), {}).get(camel_to_snake(type(self).__name__))
         lambda_importance = config.get("lambda_importance", 2.0)
         gamma = config.get("gamma", 0.35)
         n = config.get("n", 2)
@@ -314,7 +317,7 @@ class ObstacleForce(Force):
 
     def _get_force(self, ped_type, index):
         # 種類に応じた設定を取得
-        config = self.configs.get(ped_type, {})
+        config = self.config.get(str(ped_type), {}).get(camel_to_snake(type(self).__name__))
         sigma = config.get("sigma", 0.2)
         threshold = config.get("threshold", 3.0)
 
@@ -330,12 +333,13 @@ class ObstacleForce(Force):
         # 各障害物への距離と方向を計算
         diff = pos - obstacles
         directions, dist = stateutils.normalize(diff)
-        dist -= self.peds.agent_radius  # 障害物との距離からエージェントの半径を引く
+        agent_radius = self.peds.get_agent_radius(ped_type)
+        dist -= agent_radius  # 障害物との距離からエージェントの半径を引く
 
         # 距離が閾値より小さい障害物にのみ影響を与える
         mask = dist < threshold
         if np.any(mask):
             directions[mask] *= np.exp(-dist[mask].reshape(-1, 1) / sigma)
             force = np.sum(directions[mask], axis=0)
-
+        
         return force

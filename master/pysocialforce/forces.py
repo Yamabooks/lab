@@ -46,6 +46,7 @@ class Force(ABC):
         force = self._get_force()
         if debug:
             logger.debug(f"{camel_to_snake(type(self).__name__)}:\n {repr(force)}")
+        print(f"{type(self).__name__} Forces:\n{force}")
         return force
 
 # 歩行者が目標地点に向かって加速する力

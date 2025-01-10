@@ -52,7 +52,7 @@ class Simulator:
         self.scene_configs = self.get_scene_configs(self.types, self.config)
         #print("\nscene_configs: ", json.dumps(self.scene_configs, indent=4))
 
-        self.force_configs = self.get_force_configs(self.types, self.config)
+        self.force_configs, self.factor_list = self.get_force_configs(self.types, self.config)
         #print("\nforce_configs: ",json.dumps(self.force_configs, indent=4))
 
         # initiate obstacles
@@ -117,7 +117,16 @@ class Simulator:
             # typeをキーとしてforce設定を格納
             force_configs[str(i)] = type_forces
 
-        return force_configs
+        # forceごとのfactorをリスト化
+        factor_list = {}
+        for ped_type, forces in force_configs.items():
+            factor_list[ped_type] = {force_name: details.get('factor') for force_name, details in forces.items()}
+        
+        print("force_configs: ", force_configs)
+        print("factor_list: ",factor_list)
+        print("test: ", factor_list.get("0")["social_force"])
+
+        return force_configs, factor_list
 
 
     def make_forces(self, force_configs):
@@ -133,9 +142,9 @@ class Simulator:
             obstacle_force = forces.ObstacleForce()
 
             # 力オブジェクトを初期化
-            desired_force.init(self, {ped_type: type_config["desired_force"]})
-            social_force.init(self, {ped_type: type_config["social_force"]})
-            obstacle_force.init(self, {ped_type: type_config["obstacle_force"]})
+            desired_force.init(self, self.force_configs, self.factor_list)
+            social_force.init(self, self.force_configs, self.factor_list)
+            obstacle_force.init(self, self.force_configs, self.factor_list)
 
             # 力をリストに追加
             forces_list.extend([desired_force, social_force, obstacle_force])
@@ -162,8 +171,10 @@ class Simulator:
     def compute_forces(self):
         """compute forces"""
         # self.forcesの各要素に指定された関数(get_force)を適用
-        return sum(map(lambda x: x.get_force(), self.forces))   # 各力を合計して計算
-
+        total_force = sum(map(lambda x: x.get_force(), self.forces))    # 各力を合計して計算
+        print(f"Total Force: {total_force}")
+        return total_force   
+    
     def get_states(self):
         """Expose whole state"""
         return self.peds.get_states()
