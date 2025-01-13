@@ -43,31 +43,19 @@ class Simulator:
         self.config = DefaultConfig()
         if config_file:
             self.config.load_config(config_file)
-
-        #print("Config内容:", vars(self.config))  # オブジェクトの属性を表示
             
         # typeごとの設定を保持
         self.types = types # 0: adult, 1: elderly, 2: child
 
         self.scene_configs = self.get_scene_configs(self.types, self.config)
-        #print("\nscene_configs: ", json.dumps(self.scene_configs, indent=4))
-
+        
         self.force_configs, self.factor_list = self.get_force_configs(self.types, self.config)
-        #print("\nforce_configs: ",json.dumps(self.force_configs, indent=4))
 
         # initiate obstacles
         self.env = EnvState(obstacles, self.config("resolution", 10.0))
 
         # initiate agents
         self.peds = PedState(state, types, groups, self.scene_configs)
-
-        #print("peds:", self.peds)  # pedsオブジェクト全体
-        #print("Current State:", self.peds.state)  # 歩行者の状態（位置、速度、目標など）
-        #print("Positions:", self.peds.pos())  # 歩行者の位置
-        #print("Velocities:", self.peds.vel())  # 歩行者の速度
-        #print("Goals:", self.peds.goal())  # 歩行者の目標地点
-        #print("Tau:", self.peds.tau())  # 歩行者のリラクゼーション時間
-        #print("Groups:", self.peds.groups)  # 歩行者のグループ情報
 
         # construct forces
         self.forces = self.make_forces(self.force_configs)
@@ -122,32 +110,24 @@ class Simulator:
         for ped_type, forces in force_configs.items():
             factor_list[ped_type] = {force_name: details.get('factor') for force_name, details in forces.items()}
         
-        print("force_configs: ", force_configs)
-        print("factor_list: ",factor_list)
-        print("test: ", factor_list.get("0")["social_force"])
-
         return force_configs, factor_list
-
 
     def make_forces(self, force_configs):
         """Construct forces for each pedestrian type and include group forces if enabled."""
         forces_list = []
 
-        # 各種類の力を生成
-        for ped_type, type_config in force_configs.items():
-            print("ped_type , type_config: ",ped_type," , ",type_config)
-            # 種類別に力を生成
-            desired_force = forces.DesiredForce()
-            social_force = forces.SocialForce()
-            obstacle_force = forces.ObstacleForce()
+        # 種類別に力を生成
+        desired_force = forces.DesiredForce()
+        social_force = forces.SocialForce()
+        obstacle_force = forces.ObstacleForce()
 
-            # 力オブジェクトを初期化
-            desired_force.init(self, self.force_configs, self.factor_list)
-            social_force.init(self, self.force_configs, self.factor_list)
-            obstacle_force.init(self, self.force_configs, self.factor_list)
+        # 力オブジェクトを初期化
+        desired_force.init(self, self.force_configs, self.factor_list)
+        social_force.init(self, self.force_configs, self.factor_list)
+        obstacle_force.init(self, self.force_configs, self.factor_list)
 
-            # 力をリストに追加
-            forces_list.extend([desired_force, social_force, obstacle_force])
+        # 力をリストに追加
+        forces_list.extend([desired_force, social_force, obstacle_force])
 
         # グループ関連の力を有効化する場合
         if self.config("scene", {}).get("enable_group", False):
@@ -163,7 +143,7 @@ class Simulator:
 
             forces_list["group"] = group_forces  # グループ力を全体の力に追加
 
-        print("Final Force List:", forces_list)
+        print("Force_list: ", forces_list)
 
         return forces_list
 
@@ -173,7 +153,7 @@ class Simulator:
         # self.forcesの各要素に指定された関数(get_force)を適用
         total_force = sum(map(lambda x: x.get_force(), self.forces))    # 各力を合計して計算
         print(f"Total Force: {total_force}")
-        return total_force   
+        return total_force
     
     def get_states(self):
         """Expose whole state"""

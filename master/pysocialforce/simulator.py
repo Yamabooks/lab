@@ -81,8 +81,9 @@ class Simulator:
 
     def compute_forces(self):
         """compute forces"""
-        print("Total_force: ",sum(map(lambda x: x.get_force(), self.forces)))
-        return sum(map(lambda x: x.get_force(), self.forces))
+        total_force = sum(map(lambda x: x.get_force(), self.forces))
+        print("total_force: ", total_force)
+        return total_force
 
     def get_states(self):
         """Expose whole state"""

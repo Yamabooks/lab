@@ -50,7 +50,7 @@ fov_phi = 90.0
 # 成人 (type=0)
 [types.0.scene]
 agent_radius = 0.35
-step_width = 1.0
+step_width = 0.4
 max_speed_multiplier = 1.3
 tau = 0.5
 
@@ -89,7 +89,7 @@ threshold = 3.0
 # 老人 (type=1)
 [types.1.scene]
 agent_radius = 0.4
-step_width = 0.8
+step_width = 0.3
 max_speed_multiplier = 1.0
 tau = 0.5
 
@@ -128,7 +128,7 @@ threshold = 2.5
 # 子供 (type=2)
 [types.2.scene]
 agent_radius = 0.3
-step_width = 0.8
+step_width = 0.3
 max_speed_multiplier = 1.5
 tau = 0.4
 

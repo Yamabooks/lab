@@ -63,17 +63,17 @@ class PedState:
 
     def speeds(self):
         """Return the speeds corresponding to a given state."""
-        return stateutils.speeds(self.state)
+        speed = stateutils.speeds(self.state)
+        return speed
 
     def step(self, force, groups=None):
         """Move peds according to forces"""
         # desired velocity
         desired_velocity = self.vel() + self.step_width * force
+
         desired_velocity = self.capped_velocity(desired_velocity, self.max_speeds)
-        print("desire_velocity: ",desired_velocity)
         # stop when arrived
         desired_velocity[stateutils.desired_directions(self.state)[1] < 0.5] = [0, 0]
-        print("direction: ", stateutils.desired_directions(self.state))
         # update state
         next_state = self.state
         next_state[:, 0:2] += desired_velocity * self.step_width
@@ -81,6 +81,7 @@ class PedState:
         next_groups = self.groups
         if groups is not None:
             next_groups = groups
+        
         self.update(next_state, next_groups)
 
     # def initial_speeds(self):

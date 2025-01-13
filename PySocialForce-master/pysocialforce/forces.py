@@ -33,12 +33,6 @@ class Force(ABC):
         self.config = config
         self.factor_list = factor_list
         
-        # 種類ごとの設定を保存
-        #for ped_type, config in configs_by_type.items():
-            #self.configs[ped_type] = config  # 各種類の設定を保持
-            #self.factors[ped_type] = config.get("factor", 1.0)  # 各種類の係数を保存
-            #print("ped_type, config: ", ped_type," 、", self.configs)
-
     @abstractmethod
     def _get_force(self) -> np.ndarray:
         """Abstract class to get social forces
@@ -47,16 +41,10 @@ class Force(ABC):
         raise NotImplementedError
 
     def get_force(self, debug=False):
-        print("name: ", camel_to_snake(type(self).__name__))
-        forces = np.zeros((self.peds.size(), 2))
-        for i, ped_type in enumerate(self.peds.types):
-            forces[i] = self._get_force(ped_type, i) * self.factor_list.get(str(ped_type), 1.0).get(camel_to_snake(type(self).__name__))
-            print("i , ped_type : ", i," , ", ped_type)
+        force = self._get_force()
         if debug:
-            logger.debug(f"{camel_to_snake(type(self).__name__)}:\n {repr(forces)}")
-        print("value: ", self.factor_list.get(str(ped_type), 1.0).get(camel_to_snake(type(self).__name__)))
-        print(f"{type(self).__name__} Forces:\n{forces}")
-        return forces
+            logger.debug(f"{camel_to_snake(type(self).__name__)}:\n {repr(force)}")
+        return force
 
 
 class GoalAttractiveForce(Force):
@@ -249,57 +237,87 @@ class GroupGazeForceAlt(Force):
 class DesiredForce(Force):
     """Calculates the force between this agent and the next assigned waypoint."""
 
-    def _get_force(self, ped_type, index):
-        config = self.config.get(str(ped_type)).get(camel_to_snake(type(self).__name__))
-        relaxation_time = config.get("relaxation_time", 0.5)
-        goal_threshold = config.get("goal_threshold", 0.2)
-
+    def _get_force(self):
         pos = self.peds.pos()
         vel = self.peds.vel()
         goal = self.peds.goal()
+
         direction, dist = stateutils.normalize(goal - pos)
+        
+        max_speeds = self.peds.max_speeds
+        forces = np.zeros((self.peds.size(), 2))
 
         # 力を計算
-        force = np.zeros((2,))
-        if dist[index] > goal_threshold:
-            force = (
-                direction[index] * self.peds.max_speeds[index] - vel[index]
-            ) / relaxation_time
-        else:
-            force = -vel[index] / relaxation_time
+        for i, ped_type in enumerate(self.peds.types):
+            config = self.config.get(str(ped_type)).get(camel_to_snake(type(self).__name__))
+            relaxation_time = config.get("relaxation_time", 0.5)
+            goal_threshold = config.get("goal_threshold", 0.2)
 
-        return force
+            if dist[i] > goal_threshold:
+                force = (direction[i] * max_speeds[i] - vel[i]) / relaxation_time
+            else:
+                force = -1.0 * vel[i] / relaxation_time
+            
+            factor = self.factor_list.get(str(ped_type), {}).get(camel_to_snake(type(self).__name__), 1.0)
+            forces[i] = force * factor
+
+        print(f"Forces[{camel_to_snake(type(self).__name__)}]: ", forces)
+
+        return forces
 
 class SocialForce(Force):
     """Calculates the social force between this agent and all the other agents."""
 
-    def _get_force(self, ped_type, index):
-        # 種類に応じた設定を取得
-        config = self.config.get(str(ped_type), {}).get(camel_to_snake(type(self).__name__))
-        lambda_importance = config.get("lambda_importance", 2.0)
-        gamma = config.get("gamma", 0.35)
-        n = config.get("n", 2)
-        n_prime = config.get("n_prime", 3)
+    def _get_force(self):
+        # 配列を初期化
+        lambda_importance = np.zeros((self.peds.size(),))
+        gamma = np.zeros((self.peds.size(),))
+        n = np.zeros((self.peds.size(),))
+        n_prime = np.zeros((self.peds.size(),))
+        factors = np.zeros((self.peds.size(),))
 
+        pos = self.peds.pos()
+        vel = self.peds.vel()
+
+        # 種類に応じた設定を取得
+        for i, ped_type in enumerate(self.peds.types):
+            config = self.config.get(str(ped_type), {}).get(camel_to_snake(type(self).__name__), {})
+            lambda_importance[i] = config.get("lambda_importance", 2.0)
+            gamma[i] = config.get("gamma", 0.35)
+            n[i] = config.get("n", 2)
+            n_prime[i] = config.get("n_prime", 3)
+            factors[i] = self.factor_list.get(str(ped_type), {}).get(camel_to_snake(type(self).__name__), 1.0)
+        
         # 歩行者間の相互作用を計算
-        pos_diff = stateutils.each_diff(self.peds.pos())  # 位置差
+        pos_diff = stateutils.each_diff(pos)  # 位置差
         diff_direction, diff_length = stateutils.normalize(pos_diff)  # 正規化方向と距離
-        vel_diff = -1.0 * stateutils.each_diff(self.peds.vel())  # 速度差
+        vel_diff = -1.0 * stateutils.each_diff(vel)  # 速度差
+
+        # lambda_importance を vel_diff の形状に拡張
+        lambda_expanded = np.repeat(lambda_importance, vel_diff.shape[0] // lambda_importance.shape[0])
+        lambda_expanded = lambda_expanded.reshape(-1, 1)  # (6, 1)
+
+        # vel_diff の形状に合わせる
+        lambda_expanded = lambda_expanded * np.ones_like(vel_diff)
 
         # 相互作用方向を計算
-        interaction_vec = lambda_importance * vel_diff + diff_direction
+        interaction_vec = lambda_expanded * vel_diff + diff_direction
         interaction_direction, interaction_length = stateutils.normalize(interaction_vec)
 
         # 角度とモデルパラメータを計算
         theta = stateutils.vector_angles(interaction_direction) - stateutils.vector_angles(
             diff_direction
         )
-        B = gamma * interaction_length
+        gamma_expanded = np.repeat(gamma, len(interaction_length) // len(gamma))
+        B = gamma_expanded * interaction_length
 
+        n_prime_expanded = np.repeat(n_prime, len(B) // len(n_prime))
+        n_expanded = np.repeat(n, len(B) // len(n))
+  
         # 力の計算
-        force_velocity_amount = np.exp(-1.0 * diff_length / B - np.square(n_prime * B * theta))
+        force_velocity_amount = np.exp(-1.0 * diff_length / B - np.square(n_prime_expanded * B * theta))
         force_angle_amount = -np.sign(theta) * np.exp(
-            -1.0 * diff_length / B - np.square(n * B * theta)
+            -1.0 * diff_length / B - np.square(n_expanded * B * theta)
         )
         force_velocity = force_velocity_amount.reshape(-1, 1) * interaction_direction
         force_angle = force_angle_amount.reshape(-1, 1) * stateutils.left_normal(
@@ -309,37 +327,54 @@ class SocialForce(Force):
         # 個々の歩行者に作用する力を抽出
         force = force_velocity + force_angle
         force = np.sum(force.reshape((self.peds.size(), -1, 2)), axis=1)
+        
+        factors_expanded = factors[:, None]
+        forces = force * factors_expanded
 
-        return force[index]
+        print(f"Forces[{camel_to_snake(type(self).__name__)}]: ", forces)
+
+        return forces
 
 class ObstacleForce(Force):
     """Calculates the force between this agent and the nearest obstacle in this scene."""
 
-    def _get_force(self, ped_type, index):
+    def _get_force(self):
+        sigma = np.zeros((self.peds.size(),))
+        threshold = np.zeros((self.peds.size(),))
+        agent_radius = np.zeros((self.peds.size(),))
+        factors = np.zeros((self.peds.size(),))
+
+        pos = self.peds.pos()
+        
         # 種類に応じた設定を取得
-        config = self.config.get(str(ped_type), {}).get(camel_to_snake(type(self).__name__))
-        sigma = config.get("sigma", 0.2)
-        threshold = config.get("threshold", 3.0)
+        for i, ped_type in enumerate(self.peds.types):
+            config = self.config.get(str(ped_type), {}).get(camel_to_snake(type(self).__name__))
+            sigma[i] = config.get("sigma", 0.2)
+            threshold[i] = config.get("threshold", 3.0)
+            agent_radius[i] = self.peds.get_agent_radius(ped_type)
+            factors[i] = self.factor_list.get(str(ped_type), {}).get(camel_to_snake(type(self).__name__), 1.0)
 
         # 初期化
-        force = np.zeros((2,))
+        force = np.zeros((self.peds.size(), 2))
         if len(self.scene.get_obstacles()) == 0:
             return force
 
         # 障害物と歩行者の位置を計算
         obstacles = np.vstack(self.scene.get_obstacles())  # 障害物の全座標
-        pos = self.peds.pos()[index]  # 現在の歩行者の位置
 
-        # 各障害物への距離と方向を計算
-        diff = pos - obstacles
-        directions, dist = stateutils.normalize(diff)
-        agent_radius = self.peds.get_agent_radius(ped_type)
-        dist -= agent_radius  # 障害物との距離からエージェントの半径を引く
+        for i, p in enumerate(pos):
+            diff = p - obstacles
+            directions, dist = stateutils.normalize(diff)
+            dist = dist - agent_radius[i]
+            if np.all(dist >= threshold[i]):
+                continue
+            dist_mask = dist < threshold[i]
+            directions[dist_mask] *= np.exp(-dist[dist_mask].reshape(-1, 1) / sigma[i])
+            force[i] = np.sum(directions[dist_mask], axis=0)
 
-        # 距離が閾値より小さい障害物にのみ影響を与える
-        mask = dist < threshold
-        if np.any(mask):
-            directions[mask] *= np.exp(-dist[mask].reshape(-1, 1) / sigma)
-            force = np.sum(directions[mask], axis=0)
-        
-        return force
+        factors_expanded = factors[:, None]
+        forces = force * factors_expanded
+
+        print(f"Forces[{camel_to_snake(type(self).__name__)}]: ", forces)
+
+        return forces

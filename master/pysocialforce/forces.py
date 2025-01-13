@@ -46,7 +46,6 @@ class Force(ABC):
         force = self._get_force()
         if debug:
             logger.debug(f"{camel_to_snake(type(self).__name__)}:\n {repr(force)}")
-        print(f"{type(self).__name__} Forces:\n{force}")
         return force
 
 # 歩行者が目標地点に向かって加速する力
@@ -250,7 +249,11 @@ class DesiredForce(Force):
         )[dist > goal_threshold, :]
         force[dist <= goal_threshold] = -1.0 * vel[dist <= goal_threshold]
         force /= relexation_time
-        return force * self.factor
+        forces = force * self.factor
+
+        print(f"Forces[{camel_to_snake(type(self).__name__)}]: ", forces)
+
+        return forces
 
 
 # 歩行者間の社会的な相互作用力を計算
@@ -297,7 +300,11 @@ class SocialForce(Force):
 
         force = force_velocity + force_angle  # n*(n-1) x 2
         force = np.sum(force.reshape((self.peds.size(), -1, 2)), axis=1)
-        return force * self.factor
+        forces = force * self.factor
+
+        print(f"Forces[{camel_to_snake(type(self).__name__)}]: ", forces)
+
+        return forces
 
 
 # 歩行者と障害物間の最小距離に基づく反発力を計算
@@ -326,4 +333,8 @@ class ObstacleForce(Force):
             directions[dist_mask] *= np.exp(-dist[dist_mask].reshape(-1, 1) / sigma)
             force[i] = np.sum(directions[dist_mask], axis=0)
 
-        return force * self.factor
+        forces = force * self.factor
+
+        print(f"Forces[{camel_to_snake(type(self).__name__)}]: ", forces)
+
+        return forces
