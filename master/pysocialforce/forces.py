@@ -76,6 +76,8 @@ class PedRepulsiveForce(Force):
         fov = FieldOfView(phi=self.config("fov_phi"), out_of_view_factor=self.config("fov_factor"),)
         w = np.expand_dims(fov(self.peds.desired_directions(), -f_ab), -1)
         F_ab = w * f_ab
+
+        print("PedRepulsive: ", np.sum(F_ab, axis=1) * self.factor)
         return np.sum(F_ab, axis=1) * self.factor
 
 # 障害物と歩行者間の反発力を計算
@@ -90,6 +92,8 @@ class SpaceRepulsiveForce(Force):
                 self.scene.get_obstacles(), u0=self.config("u0"), r=self.config("r")
             )
             F_aB = -1.0 * potential_func.grad_r_aB(self.peds.state)
+        
+            print("SpaceRepulsive: ", np.sum(F_aB, axis=1) * self.factor)
         return np.sum(F_aB, axis=1) * self.factor
 
 
@@ -251,7 +255,7 @@ class DesiredForce(Force):
         force /= relexation_time
         forces = force * self.factor
 
-        print(f"Forces[{camel_to_snake(type(self).__name__)}]: ", forces)
+        #print(f"Forces[{camel_to_snake(type(self).__name__)}]: ", forces)
 
         return forces
 
@@ -302,7 +306,7 @@ class SocialForce(Force):
         force = np.sum(force.reshape((self.peds.size(), -1, 2)), axis=1)
         forces = force * self.factor
 
-        print(f"Forces[{camel_to_snake(type(self).__name__)}]: ", forces)
+        #print(f"Forces[{camel_to_snake(type(self).__name__)}]: ", forces)
 
         return forces
 
@@ -335,6 +339,6 @@ class ObstacleForce(Force):
 
         forces = force * self.factor
 
-        print(f"Forces[{camel_to_snake(type(self).__name__)}]: ", forces)
+        #print(f"Forces[{camel_to_snake(type(self).__name__)}]: ", forces)
 
         return forces

@@ -96,21 +96,21 @@ class SceneVisualizer:
     def plot(self):
         """Main method for create plot"""
         self.plot_obstacles()
+
         groups = self.group_states[0]  # static group for now
         if not groups:
             for ped in range(self.scene.peds.size()):
                 x = self.states[:, ped, 0]
                 y = self.states[:, ped, 1]
-                self.ax.plot(x, y, "-o", label=f"ped {ped}", markersize=2.5)
+                self.ax.plot(x, y, "-o", markersize=2.5, color="none")
         else:
-
             colors = plt.cm.rainbow(np.linspace(0, 1, len(groups)))
 
             for i, group in enumerate(groups):
                 for ped in group:
                     x = self.states[:, ped, 0]
                     y = self.states[:, ped, 1]
-                    self.ax.plot(x, y, "-o", label=f"ped {ped}", markersize=2.5, color=colors[i])
+                    self.ax.plot(x, y, "-o", label=f"ped {ped}", markersize=2.5, color="none") # color[i]
         self.ax.legend()
         return self.fig
 
@@ -176,6 +176,10 @@ class SceneVisualizer:
         :param step: index of state, default is the latest
         :return: list of patches
         """
+
+        # タイプ別の色マッピング
+        type_colors = {0: "red", 1: "blue", 2: "lightgreen"}  # 0: adult, 1: elderly, 2: child
+
         states, _ = self.scene.get_states()
         current_state = states[step]
         # radius = 0.2 + np.linalg.norm(current_state[:, 2:4], axis=-1) / 2.0 * 0.3
@@ -189,15 +193,11 @@ class SceneVisualizer:
             self.human_actors = [
                 Circle(pos, radius=r) for pos, r in zip(current_state[:, :2], radius)
             ]
+        
+        # 各歩行者の色を設定
+        colors = [type_colors[self.scene.peds.types[i]] for i in range(current_state.shape[0])]
         self.human_collection.set_paths(self.human_actors)
-        if not self.agent_colors:
-            self.human_collection.set_array(np.arange(current_state.shape[0]))
-        else:
-            # set colors for each agent
-            assert len(self.human_actors) == len(
-                self.agent_colors
-            ), "agent_colors must be the same length as the agents"
-            self.human_collection.set_facecolor(self.agent_colors)
+        self.human_collection.set_facecolor(colors)  # タイプ別の色を設定
 
     def plot_groups(self, step=-1):
         """Generate patches for groups

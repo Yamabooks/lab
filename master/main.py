@@ -21,8 +21,17 @@ if __name__ == "__main__":
     groups = [[0], [1],]
     # list of linear obstacles given in the form of (x_min, x_max, y_min, y_max)
     # obs = [[-1, -1, -1, 11], [3, 3, -1, 11]]
-    #obs = [[-1, 1, 7, 7],[2, 4, 4, 4]]
-    obs = [[-0.5, 0.5, 5, 5]]
+    obs = [
+        [-6, -6, -11, 11],  # 左の壁
+        [6, 6, -11, 11],    # 右の壁
+        [-1.5, 0, 5, 6],    # 中上辺
+        [0, 1.5, 6, 5],
+        [-1.5, 0, -5, -6],    # 中下辺
+        [0, 1.5, -6, -5],  
+        [-1.5, -1.5, 5, -5],
+        [1.5, 1.5, 5, -5],
+
+    ]
     #obs = None
     # initiate the simulator,
     s = Simulator(

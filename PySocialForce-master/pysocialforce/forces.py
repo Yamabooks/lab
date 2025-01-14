@@ -8,8 +8,6 @@ from pysocialforce.potentials import PedPedPotential, PedSpacePotential
 from pysocialforce.fieldofview import FieldOfView
 from pysocialforce.utils import Config, stateutils, logger
 
-import json
-
 def camel_to_snake(camel_case_string):
     """Convert CamelCase to snake_case"""
 
@@ -64,43 +62,64 @@ class GoalAttractiveForce(Force):
 
 class PedRepulsiveForce(Force):
     """Ped to ped repulsive force"""
-    def __init__(self, config):
-        super().__init__()
-        self.v0 = config("v0", 2.1)
-        self.sigma = config("sigma", 0.3)
-        self.fov_phi = config("fov_phi", 100.0)
-        self.fov_factor = config("fov_factor", 0.5)
-
     def _get_force(self):
-        potential_func = PedPedPotential(self.peds.step_width, v0=self.v0, sigma=self.sigma)
+        v0 = np.zeros((self.peds.size(),))
+        sigma = np.zeros((self.peds.size(),))
+        fov_phi = np.zeros((self.peds.size(),))
+        fov_factor = np.zeros((self.peds.size(),))
+        step_width = np.zeros((self.peds.size(),))
+        factors = np.zeros((self.peds.size(),))
+        scene_config = self.peds.scene_configs
+
+        for i, ped_type in enumerate(self.peds.types):
+            config = self.config.get(str(ped_type), {}).get(camel_to_snake(type(self).__name__), {})
+            v0[i] = config.get("v0", 2.1)
+            sigma[i] = config.get("sigma", 0.3)
+            fov_phi[i] = config.get("fov_factor", 100.0)
+            fov_factor[i] = config.get("fov_factor", 0.5)
+            step_width[i] = scene_config.get(str(ped_type)).get("scene").get("step_width")
+            factors[i] = self.factor_list.get(str(ped_type), {}).get(camel_to_snake(type(self).__name__), 1.0)
+
+        potential_func = PedPedPotential(step_width, v0, sigma)
         f_ab = -1.0 * potential_func.grad_r_ab(self.peds.state)
 
-        fov = FieldOfView(phi=self.fov_phi, out_of_view_factor=self.fov_factor)
+        fov = FieldOfView(phi=fov_phi, out_of_view_factor=fov_factor)
         w = np.expand_dims(fov(self.peds.desired_directions(), -f_ab), -1)
         F_ab = w * f_ab
 
-        return np.sum(F_ab, axis=1) * self.factor
+        factors_expanded = factors[:, None]
+        forces = np.sum(F_ab, axis=1) * factors_expanded
 
+        print("PedRepulsive: ",forces)
+        return forces
 
 class SpaceRepulsiveForce(Force):
     """obstacles to ped repulsive force"""
-    def __init__(self, config):
-        super().__init__()
-        self.v0 = config("v0", 2.1)
-        self.sigma = config("sigma", 0.3)
-        self.fov_phi = config("fov_phi", 100.0)
-        self.fov_factor = config("fov_factor", 0.5)
-
     def _get_force(self):
-        potential_func = PedPedPotential(self.peds.step_width, v0=self.v0, sigma=self.sigma)
-        f_ab = -1.0 * potential_func.grad_r_ab(self.peds.state)
+        u0 = np.zeros((self.peds.size(),))
+        r = np.zeros((self.peds.size(),))
+        factors = np.zeros((self.peds.size(),))
 
-        fov = FieldOfView(phi=self.fov_phi, out_of_view_factor=self.fov_factor)
-        w = np.expand_dims(fov(self.peds.desired_directions(), -f_ab), -1)
-        F_ab = w * f_ab
+        for i, ped_type in enumerate(self.peds.types):
+            config = self.config.get(str(ped_type), {}).get(camel_to_snake(type(self).__name__), {})
+            u0[i] = config.get("u0", 10)
+            r[i] = config.get("r", 0.2)
+            factors[i] = self.factor_list.get(str(ped_type), {}).get(camel_to_snake(type(self).__name__), 1.0)
 
-        return np.sum(F_ab, axis=1) * self.factor
+        # 力の計算
+        if self.scene.get_obstacles() is None:
+            F_aB = np.zeros((self.peds.size(), 0, 2))
+        else:
+            potential_func = PedSpacePotential(
+                self.scene.get_obstacles(), u0, r
+                )
+            F_aB = -1.0 * potential_func.grad_r_aB(self.peds.state)
+        
+        factors_expanded = factors[:, None]
+        forces = np.sum(F_aB, axis=1) * factors_expanded
 
+        print("SpaceRepulsive: ", forces)
+        return forces
 
 class GroupCoherenceForce(Force):
     """Group coherence force, paper version"""
@@ -261,7 +280,7 @@ class DesiredForce(Force):
             factor = self.factor_list.get(str(ped_type), {}).get(camel_to_snake(type(self).__name__), 1.0)
             forces[i] = force * factor
 
-        print(f"Forces[{camel_to_snake(type(self).__name__)}]: ", forces)
+        #print(f"Forces[{camel_to_snake(type(self).__name__)}]: ", forces)
 
         return forces
 
@@ -331,7 +350,7 @@ class SocialForce(Force):
         factors_expanded = factors[:, None]
         forces = force * factors_expanded
 
-        print(f"Forces[{camel_to_snake(type(self).__name__)}]: ", forces)
+        #print(f"Forces[{camel_to_snake(type(self).__name__)}]: ", forces)
 
         return forces
 
@@ -375,6 +394,6 @@ class ObstacleForce(Force):
         factors_expanded = factors[:, None]
         forces = force * factors_expanded
 
-        print(f"Forces[{camel_to_snake(type(self).__name__)}]: ", forces)
+        #print(f"Forces[{camel_to_snake(type(self).__name__)}]: ", forces)
 
         return forces

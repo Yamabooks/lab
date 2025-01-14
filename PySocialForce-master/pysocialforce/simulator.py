@@ -8,8 +8,6 @@ from pysocialforce.utils import DefaultConfig
 from pysocialforce.scene import PedState, EnvState
 from pysocialforce import forces
 
-import json
-
 class Simulator:
     """Simulate social force model.
 
@@ -52,13 +50,13 @@ class Simulator:
         self.force_configs, self.factor_list = self.get_force_configs(self.types, self.config)
 
         # initiate obstacles
-        self.env = EnvState(obstacles, self.config("resolution", 10.0))
+        self.env = EnvState(obstacles, self.config("resolution", 50.0))
 
         # initiate agents
         self.peds = PedState(state, types, groups, self.scene_configs)
 
         # construct forces
-        self.forces = self.make_forces(self.force_configs)
+        self.forces = self.make_forces()
 
     # configからtypeごとのsceneを抜き出す
     def get_scene_configs(self, types, config):
@@ -112,40 +110,40 @@ class Simulator:
         
         return force_configs, factor_list
 
-    def make_forces(self, force_configs):
+    def make_forces(self):
         """Construct forces for each pedestrian type and include group forces if enabled."""
         forces_list = []
 
-        # 種類別に力を生成
-        desired_force = forces.DesiredForce()
-        social_force = forces.SocialForce()
-        obstacle_force = forces.ObstacleForce()
+        # 種類別に力を生成し初期化
+        forces_to_initialize = [
+            forces.DesiredForce,
+            forces.SocialForce,
+            forces.ObstacleForce,
+            forces.PedRepulsiveForce,
+            forces.SpaceRepulsiveForce,
+        ]
 
-        # 力オブジェクトを初期化
-        desired_force.init(self, self.force_configs, self.factor_list)
-        social_force.init(self, self.force_configs, self.factor_list)
-        obstacle_force.init(self, self.force_configs, self.factor_list)
-
-        # 力をリストに追加
-        forces_list.extend([desired_force, social_force, obstacle_force])
+        for force_class in forces_to_initialize:
+            force = force_class()
+            force.init(self, self.force_configs, self.factor_list)
+            forces_list.append(force)
 
         # グループ関連の力を有効化する場合
         if self.config("scene", {}).get("enable_group", False):
-            group_force_config = self.config  # グループ力は全体設定を利用
-            group_forces = [
-                forces.GroupCoherenceForceAlt(),
-                forces.GroupRepulsiveForce(),
-                forces.GroupGazeForceAlt(),
+            group_forces_to_initialize = [
+                forces.GroupCoherenceForceAlt,
+                forces.GroupRepulsiveForce,
+                forces.GroupGazeForceAlt,
             ]
-            # グループ力に対して初期化を行う
-            for group_force in group_forces:
-                group_force.init(self, group_force_config)
 
-            forces_list["group"] = group_forces  # グループ力を全体の力に追加
+            for group_force_class in group_forces_to_initialize:
+                group_force = group_force_class()
+                group_force.init(self, self.config)
+                forces_list.append(group_force)
 
-        print("Force_list: ", forces_list)
-
+        #print("Force_list: ", forces_list)
         return forces_list
+
 
     # self.forcesに格納されたすべての力(Desired,social,...)を呼び出して計算
     def compute_forces(self):
