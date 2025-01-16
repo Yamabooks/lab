@@ -16,6 +16,7 @@ class FieldOfView(object):
         self.cosphi = np.cos(phi / 180.0 * np.pi)
         self.out_of_view_factor = out_of_view_factor
 
+
     def __call__(self, desired_direction, forces_direction):
         """Weighting factor for field of view.
 

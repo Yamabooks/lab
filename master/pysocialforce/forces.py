@@ -74,7 +74,9 @@ class PedRepulsiveForce(Force):
         f_ab = -1.0 * potential_func.grad_r_ab(self.peds.state)
 
         fov = FieldOfView(phi=self.config("fov_phi"), out_of_view_factor=self.config("fov_factor"),)
+
         w = np.expand_dims(fov(self.peds.desired_directions(), -f_ab), -1)
+
         F_ab = w * f_ab
 
         print("PedRepulsive: ", np.sum(F_ab, axis=1) * self.factor)

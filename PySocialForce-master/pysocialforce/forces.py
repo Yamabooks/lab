@@ -75,7 +75,7 @@ class PedRepulsiveForce(Force):
             config = self.config.get(str(ped_type), {}).get(camel_to_snake(type(self).__name__), {})
             v0[i] = config.get("v0", 2.1)
             sigma[i] = config.get("sigma", 0.3)
-            fov_phi[i] = config.get("fov_factor", 100.0)
+            fov_phi[i] = config.get("fov_phi", 100.0)
             fov_factor[i] = config.get("fov_factor", 0.5)
             step_width[i] = scene_config.get(str(ped_type)).get("scene").get("step_width")
             factors[i] = self.factor_list.get(str(ped_type), {}).get(camel_to_snake(type(self).__name__), 1.0)
@@ -83,8 +83,9 @@ class PedRepulsiveForce(Force):
         potential_func = PedPedPotential(step_width, v0, sigma)
         f_ab = -1.0 * potential_func.grad_r_ab(self.peds.state)
 
-        fov = FieldOfView(phi=fov_phi, out_of_view_factor=fov_factor)
+        fov = FieldOfView(fov_phi, fov_factor)
         w = np.expand_dims(fov(self.peds.desired_directions(), -f_ab), -1)
+        
         F_ab = w * f_ab
 
         factors_expanded = factors[:, None]

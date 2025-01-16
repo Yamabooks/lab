@@ -42,7 +42,7 @@ if __name__ == "__main__":
         config_file=Path(__file__).resolve().parent.joinpath("main.toml"),
     )
     # update 80 steps
-    s.step(10)
+    s.step(1)
     #s.step(120)
 
     output_folder = Path("outexample")

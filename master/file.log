@@ -39,3 +39,13 @@
 2025-01-14 18:48:59,214|WARNING:[animation.py:1037                 save() ] MovieWriter imagemagick unavailable; using Pillow instead.
 2025-01-14 19:19:19,801|WARNING:[animation.py:1037                 save() ] MovieWriter imagemagick unavailable; using Pillow instead.
 2025-01-14 19:22:44,871|WARNING:[animation.py:1037                 save() ] MovieWriter imagemagick unavailable; using Pillow instead.
+2025-01-17 02:38:19,631|WARNING:[animation.py:1037                 save() ] MovieWriter imagemagick unavailable; using Pillow instead.
+2025-01-17 02:39:05,101|WARNING:[animation.py:1037                 save() ] MovieWriter imagemagick unavailable; using Pillow instead.
+2025-01-17 04:10:01,292|WARNING:[animation.py:1037                 save() ] MovieWriter imagemagick unavailable; using Pillow instead.
+2025-01-17 04:10:34,842|WARNING:[animation.py:1037                 save() ] MovieWriter imagemagick unavailable; using Pillow instead.
+2025-01-17 04:21:33,749|WARNING:[animation.py:1037                 save() ] MovieWriter imagemagick unavailable; using Pillow instead.
+2025-01-17 04:23:00,012|WARNING:[animation.py:1037                 save() ] MovieWriter imagemagick unavailable; using Pillow instead.
+2025-01-17 04:25:17,767|WARNING:[animation.py:1037                 save() ] MovieWriter imagemagick unavailable; using Pillow instead.
+2025-01-17 04:26:54,512|WARNING:[animation.py:1037                 save() ] MovieWriter imagemagick unavailable; using Pillow instead.
+2025-01-17 04:29:10,792|WARNING:[animation.py:1037                 save() ] MovieWriter imagemagick unavailable; using Pillow instead.
+2025-01-17 04:29:47,125|WARNING:[animation.py:1037                 save() ] MovieWriter imagemagick unavailable; using Pillow instead.

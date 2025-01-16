@@ -59,7 +59,7 @@ factor = 1.0
 
 [types.0.forces.ped_repulsive_force]
 factor = 1.5
-v0 = 2.0
+v0 = 2.1
 sigma = 0.3
 fov_phi = 100.0
 fov_factor = 0.5

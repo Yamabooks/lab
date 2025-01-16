@@ -13,9 +13,12 @@ class PedPedPotential(object):
     """
 
     def __init__(self, delta_t, v0=None, sigma=None):
-        self.delta_t = delta_t
-        self.v0 = v0
-        self.sigma = sigma
+        self.delta_t = np.expand_dims(delta_t, axis=0)
+        self.v0 = np.expand_dims(v0, axis=0)
+        self.sigma = np.expand_dims(sigma, axis=0)
+        print("step_width: ", self.delta_t)
+        print("v0: ", self.v0)
+        print("sigma: ", self.sigma)
 
     def b(self, r_ab, speeds, desired_directions):
         """Calculate b.
@@ -23,14 +26,13 @@ class PedPedPotential(object):
         e: desired direction
         2b=sqrt((r_ab+(r_ab-v*delta_t*e_b))
         """
-        delta_t = self.delta_t[:, np.newaxis, np.newaxis]
         speeds_b = np.expand_dims(speeds, axis=0)
-        speeds_b_abc = np.expand_dims(speeds_b, axis=2)  # (1, 5, 1)
+        speeds_b_abc = np.expand_dims(speeds_b, axis=0)  # (1, 5, 1)
         e_b = np.expand_dims(desired_directions, axis=0)
 
         in_sqrt = (
             np.linalg.norm(r_ab, axis=-1)
-            + np.linalg.norm(r_ab - delta_t * speeds_b_abc * e_b, axis=-1)
+            + np.linalg.norm(r_ab - self.delta_t * speeds_b_abc * e_b, axis=-1)
         ) ** 2 - (self.delta_t * speeds_b) ** 2
         np.fill_diagonal(in_sqrt, 0.0)
 
@@ -38,7 +40,8 @@ class PedPedPotential(object):
 
     def value_r_ab(self, r_ab, speeds, desired_directions):
         """Value of potential explicitly parametrized with r_ab."""
-        return self.v0 * np.exp(-self.b(r_ab, speeds, desired_directions) / self.sigma)
+        value = -self.b(r_ab, speeds, desired_directions)
+        return self.v0 * np.exp(value / self.sigma)
 
     @staticmethod
     def r_ab(state):
@@ -67,7 +70,6 @@ class PedPedPotential(object):
         # remove gradients from self-intereactions
         np.fill_diagonal(dvdx, 0.0)
         np.fill_diagonal(dvdy, 0.0)
-
         return np.stack((dvdx, dvdy), axis=-1)
     
 class PedSpacePotential(object):

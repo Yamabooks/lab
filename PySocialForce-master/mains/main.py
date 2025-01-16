@@ -50,7 +50,7 @@ if __name__ == "__main__":
             #[3.0, 0.0, 0.5, 0.5, 4.0, 10.0],
         ]
     )
-    types = [0,1]    # 0: 成人, 1: 老人, 2: 子供
+    types = [0,0]    # 0: 成人, 1: 老人, 2: 子供
     # social groups informoation is represented as lists of indices of the state array
     groups = [[0], [1],]
 
@@ -79,7 +79,7 @@ if __name__ == "__main__":
         config_file=Path(__file__).resolve().parent.joinpath("main.toml"),
     )
     
-    s.step(10)
+    s.step(1)
 
     with psf.plot.SceneVisualizer(s, "output/animation") as sv:
         sv.animate()
