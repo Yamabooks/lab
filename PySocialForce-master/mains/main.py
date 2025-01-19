@@ -16,7 +16,7 @@ if __name__ == "__main__":
     #groups = []  # グループリスト
     groups = None
 
-    """for i in range(num_pedestrians):
+    for i in range(num_pedestrians):
         # スタートのy座標を10または-10に設定（ランダムに選択）
         start_y = 10 if uniform(0, 1) > 0.5 else -10
         start_x = uniform(-5, 5)  # x座標を-5～5の範囲でランダムに生成
@@ -25,9 +25,10 @@ if __name__ == "__main__":
         goal_y = -10 if start_y == 10 else 10
         goal_x = uniform(-5, 5)  # x座標を-5～5の範囲でランダムに生成
 
-        # 初期速度を0に設定
-        vx, vy = 0.0, -0.5 if start_y == 10 else 0.5
-
+        # 初期速度を0.5に固定
+        vx = 0.5 * (-1 if start_x > goal_x else 1)  # ゴール方向に向かうよう符号を調整
+        vy = 0.5 * (-1 if start_y > goal_y else 1)  # ゴール方向に向かうよう符号を調整
+      
         # 状態をリストに追加
         initial_state.append([start_x, start_y, vx, vy, goal_x, goal_y])
 
@@ -38,21 +39,21 @@ if __name__ == "__main__":
         #groups.append([i])
 
     # NumPy配列に変換
-    initial_state = np.array(initial_state)"""
+    initial_state = np.array(initial_state)
 
-    initial_state = np.array(
+    """initial_state = np.array(
         [
             [-1.0, 10, -0.5, -0.5, 1.0, -10],
             [1.0, 10, -0.5, -0.5, -1.0, -10.0],
             #[0.0, 0.0, 0.5, 0.5, 1.0, 10.0],
             #[1.0, 0.0, 0.5, 0.5, 2.0, 10.0],
             #[2.0, 10, -0.5, -0.5, 3.0, 0.0],
-            #[3.0, 0.0, 0.5, 0.5, 4.0, 10.0],
+            [3.0, 0.0, 0.5, 0.5, 4.0, 10.0],
         ]
     )
-    types = [0,0]    # 0: 成人, 1: 老人, 2: 子供
+    types = [0,0,0]    # 0: 成人, 1: 老人, 2: 子供
     # social groups informoation is represented as lists of indices of the state array
-    groups = [[0], [1],]
+    groups = [[0], [1], [2]]"""
 
     # 確認用の出力
     print("Initial State: ", initial_state)
@@ -79,7 +80,7 @@ if __name__ == "__main__":
         config_file=Path(__file__).resolve().parent.joinpath("main.toml"),
     )
     
-    s.step(1)
+    s.step(100)
 
     with psf.plot.SceneVisualizer(s, "output/animation") as sv:
         sv.animate()

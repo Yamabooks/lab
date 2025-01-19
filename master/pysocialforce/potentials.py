@@ -29,8 +29,9 @@ class PedPedPotential(object):
 
         in_sqrt = (
             np.linalg.norm(r_ab, axis=-1)
-            + np.linalg.norm(r_ab - self.delta_t * speeds_b_abc * e_b, axis=-1)
+            + np.linalg.norm(r_ab - (self.delta_t * speeds_b_abc * e_b), axis=-1)
         ) ** 2 - (self.delta_t * speeds_b) ** 2
+        
         np.fill_diagonal(in_sqrt, 0.0)
 
         return 0.5 * np.sqrt(in_sqrt)

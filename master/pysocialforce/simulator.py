@@ -63,7 +63,7 @@ class Simulator:
             forces.SocialForce(),
             forces.ObstacleForce(),
             forces.PedRepulsiveForce(),
-            #forces.SpaceRepulsiveForce(),
+            forces.SpaceRepulsiveForce(),
         ]
         group_forces = [
             forces.GroupCoherenceForceAlt(),

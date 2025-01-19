@@ -91,7 +91,7 @@ class PedRepulsiveForce(Force):
         factors_expanded = factors[:, None]
         forces = np.sum(F_ab, axis=1) * factors_expanded
 
-        print("PedRepulsive: ",forces)
+        #print("PedRepulsive: ",forces)
         return forces
 
 class SpaceRepulsiveForce(Force):
@@ -119,7 +119,7 @@ class SpaceRepulsiveForce(Force):
         factors_expanded = factors[:, None]
         forces = np.sum(F_aB, axis=1) * factors_expanded
 
-        print("SpaceRepulsive: ", forces)
+        #print("SpaceRepulsive: ", forces)
         return forces
 
 class GroupCoherenceForce(Force):

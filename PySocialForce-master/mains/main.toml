@@ -110,8 +110,8 @@ r = 0.25
 
 [types.1.forces.desired_force]
 factor = 1.0
-goal_threshold = 0.6
-relaxation_time = 0.3
+goal_threshold = 0.5
+relaxation_time = 0.2
 
 [types.1.forces.social_force]
 factor = 4.0
@@ -149,12 +149,12 @@ r = 0.15
 
 [types.2.forces.desired_force]
 factor = 1.2
-goal_threshold = 0.4
-relaxation_time = 0.15
+goal_threshold = 0.2
+relaxation_time = 0.5
 
 [types.2.forces.social_force]
 factor = 6.0
-lambda_importance = 2.2
+lambda_importance = 1.8
 gamma = 0.3
 n = 3
 n_prime = 4

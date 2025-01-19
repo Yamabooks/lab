@@ -13,12 +13,9 @@ class PedPedPotential(object):
     """
 
     def __init__(self, delta_t, v0=None, sigma=None):
-        self.delta_t = np.expand_dims(delta_t, axis=0)
+        self.delta_t = np.expand_dims(delta_t, axis=(0, -1))
         self.v0 = np.expand_dims(v0, axis=0)
         self.sigma = np.expand_dims(sigma, axis=0)
-        print("step_width: ", self.delta_t)
-        print("v0: ", self.v0)
-        print("sigma: ", self.sigma)
 
     def b(self, r_ab, speeds, desired_directions):
         """Calculate b.
@@ -27,13 +24,15 @@ class PedPedPotential(object):
         2b=sqrt((r_ab+(r_ab-v*delta_t*e_b))
         """
         speeds_b = np.expand_dims(speeds, axis=0)
-        speeds_b_abc = np.expand_dims(speeds_b, axis=0)  # (1, 5, 1)
+        speeds_b_abc = np.expand_dims(speeds_b, axis=2)
         e_b = np.expand_dims(desired_directions, axis=0)
 
         in_sqrt = (
             np.linalg.norm(r_ab, axis=-1)
-            + np.linalg.norm(r_ab - self.delta_t * speeds_b_abc * e_b, axis=-1)
-        ) ** 2 - (self.delta_t * speeds_b) ** 2
+            + np.linalg.norm(r_ab - (self.delta_t * speeds_b_abc * e_b), axis=-1)
+        ) ** 2 - (self.delta_t.squeeze() * speeds_b) ** 2
+
+
         np.fill_diagonal(in_sqrt, 0.0)
 
         return 0.5 * np.sqrt(in_sqrt)
@@ -85,10 +84,13 @@ class PedSpacePotential(object):
         self.obstacles = obstacles or []
         self.u0 = np.expand_dims(u0, axis=1)
         self.r = np.expand_dims(r, axis=1)
+        print("u0: ", self.u0)
+        print("r: ", self.r)
 
     def value_r_aB(self, r_aB):
         """Compute value parametrized with r_aB."""
-        return self.u0 * np.exp(-1.0 * np.linalg.norm(r_aB, axis=-1)) / self.r
+        value = np.linalg.norm(r_aB, axis=-1)
+        return self.u0 * np.exp(-1.0 * value / self.r)
 
     def r_aB(self, state):
         """r_aB"""

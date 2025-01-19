@@ -10,15 +10,15 @@ if __name__ == "__main__":
         [
             [-1.0, 10, -0.5, -0.5, 1.0, -10],
             [1.0, 10, -0.5, -0.5, -1.0, -10.0],
-            #[0.0, 0.0, 0.5, 0.5, 1.0, 10.0],
+            [0.0, 0.0, 0.5, 0.5, 1.0, 10.0],
             #[1.0, 0.0, 0.5, 0.5, 2.0, 10.0],
             #[2.0, 10, -0.5, -0.5, 3.0, 0.0],
-            #[3.0, 0.0, 0.5, 0.5, 4.0, 10.0],
+            [3.0, 0.0, 0.5, 0.5, 4.0, 10.0],
         ]
     )
-    type = [0,1]    # 0: 成人, 1: 老人, 2: 子供
+    type = [0,1,0]    # 0: 成人, 1: 老人, 2: 子供
     # social groups informoation is represented as lists of indices of the state array
-    groups = [[0], [1],]
+    groups = [[0], [1],[1]]
     # list of linear obstacles given in the form of (x_min, x_max, y_min, y_max)
     # obs = [[-1, -1, -1, 11], [3, 3, -1, 11]]
     obs = [
@@ -42,7 +42,7 @@ if __name__ == "__main__":
         config_file=Path(__file__).resolve().parent.joinpath("main.toml"),
     )
     # update 80 steps
-    s.step(1)
+    s.step(5)
     #s.step(120)
 
     output_folder = Path("outexample")
