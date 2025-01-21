@@ -21,6 +21,7 @@ class Force(ABC):
         super().__init__()
         self.scene = None  # シーン情報（歩行者や障害物の情報など）
         self.peds = None  # 歩行者情報
+        self.default_config = Config()
         self.config = {}  # 種類ごとの設定を保持
     
     def init(self, scene, config, factor_list):
@@ -124,9 +125,15 @@ class SpaceRepulsiveForce(Force):
 
 class GroupCoherenceForce(Force):
     """Group coherence force, paper version"""
+    
 
     def _get_force(self):
+        factors = np.zeros((self.peds.size(),))
         forces = np.zeros((self.peds.size(), 2))
+
+        for i, ped_type in enumerate(self.peds.types):
+            factors[i] = self.factor_list.get(str(ped_type), {}).get(camel_to_snake(type(self).__name__), 1.0)
+
         if self.peds.has_group():
             for group in self.peds.groups:
                 threshold = (len(group) - 1) / 2
@@ -136,14 +143,23 @@ class GroupCoherenceForce(Force):
                 vectors, norms = stateutils.normalize(force_vec)
                 vectors[norms < threshold] = [0, 0]
                 forces[group, :] += vectors
-        return forces * self.factor
+        
+        factors_expanded = factors[:, None]
+        forces = forces * factors_expanded
+
+        return forces
 
 
 class GroupCoherenceForceAlt(Force):
     """ Alternative group coherence force as specified in pedsim_ros"""
 
     def _get_force(self):
+        factors = np.zeros((self.peds.size(),))
         forces = np.zeros((self.peds.size(), 2))
+
+        for i, ped_type in enumerate(self.peds.types):
+            factors[i] = self.factor_list.get(str(ped_type), {}).get(camel_to_snake(type(self).__name__), 1.0)
+
         if self.peds.has_group():
             for group in self.peds.groups:
                 threshold = (len(group) - 1) / 2
@@ -153,15 +169,23 @@ class GroupCoherenceForceAlt(Force):
                 norms = stateutils.speeds(force_vec)
                 softened_factor = (np.tanh(norms - threshold) + 1) / 2
                 forces[group, :] += (force_vec.T * softened_factor).T
-        return forces * self.factor
+
+        factors_expanded = factors[:, None]
+        forces = forces * factors_expanded
+
+        return forces
 
 
 class GroupRepulsiveForce(Force):
     """Group repulsive force"""
 
     def _get_force(self):
-        threshold = self.config("threshold", 0.5)
         forces = np.zeros((self.peds.size(), 2))
+
+        config = self.default_config.sub_config(camel_to_snake(type(self).__name__))
+        threshold = config("threshold", 0.5)
+        factor = config("factor", 1.0)
+
         if self.peds.has_group():
             for group in self.peds.groups:
                 size = len(group)
@@ -172,7 +196,9 @@ class GroupRepulsiveForce(Force):
                 # forces[group, :] += np.sum(diff, axis=0)
                 forces[group, :] += np.sum(diff.reshape((size, -1, 2)), axis=1)
 
-        return forces * self.factor
+        forces = forces * factor
+
+        return forces
 
 
 class GroupGazeForce(Force):
@@ -180,8 +206,12 @@ class GroupGazeForce(Force):
 
     def _get_force(self):
         forces = np.zeros((self.peds.size(), 2))
-        vision_angle = self.config("fov_phi", 100.0)
+
+        config = self.default_config.sub_config(camel_to_snake(type(self).__name__))
+        vision_angle = config("fov_phi", 100.0)
+        factor = config("factor", 4.0)
         directions, _ = stateutils.desired_directions(self.peds.state)
+
         if self.peds.has_group():
             for group in self.peds.groups:
                 group_size = len(group)
@@ -211,7 +241,7 @@ class GroupGazeForce(Force):
                 force = -rotation.reshape(-1, 1) * member_directions
                 forces[group, :] += force
 
-        return forces * self.factor
+        return forces * factor
 
 
 class GroupGazeForceAlt(Force):
@@ -219,7 +249,11 @@ class GroupGazeForceAlt(Force):
 
     def _get_force(self):
         forces = np.zeros((self.peds.size(), 2))
+
+        config = self.default_config.sub_config(camel_to_snake(type(self).__name__))
+        factor = config("factor", 4.0)
         directions, dist = stateutils.desired_directions(self.peds.state)
+        
         if self.peds.has_group():
             for group in self.peds.groups:
                 group_size = len(group)
@@ -251,7 +285,7 @@ class GroupGazeForceAlt(Force):
                 )
                 forces[group, :] += force
 
-        return forces * self.factor
+        return forces * factor
 
 
 class DesiredForce(Force):

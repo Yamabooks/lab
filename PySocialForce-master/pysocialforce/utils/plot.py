@@ -140,6 +140,7 @@ class SceneVisualizer:
         plt.rcParams["animation.html"] = "jshtml"
 
         # x, y limit from states, only for animation
+        """
         margin = 2.0
         xy_limits = np.array(
             [minmax(state) for state in self.states]
@@ -147,6 +148,9 @@ class SceneVisualizer:
         xy_min = np.min(xy_limits[:, :2], axis=0) - margin
         xy_max = np.max(xy_limits[:, 2:4], axis=0) + margin
         self.ax.set(xlim=(xy_min[0], xy_max[0]), ylim=(xy_min[1], xy_max[1]))
+        """
+        self.ax.set_xlim(-30, 30)
+        self.ax.set_ylim(0, 20)
 
         # # recompute the ax.dataLim
         # self.ax.relim()

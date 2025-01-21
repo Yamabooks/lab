@@ -9,13 +9,14 @@ from pysocialforce.utils import stateutils
 class PedState:
     """歩行者の位置、速度、目標地点、およびグループ情報を追跡"""
 
-    def __init__(self, state, types, groups, scene_configs):
+    def __init__(self, state, waypoints, types, groups, scene_configs):
         """
         state: 初期状態（各歩行者の位置、速度、目標地点など）を保持するnumpy配列。
         types: 各歩行者のタイプ（0: 成人、1: 老人、2: 子供）。
         groups: 歩行者のグループ情報（例: [[0, 1], [2]]）。
         scene_configs: タイプ別のシーン設定を格納した辞書。
         """
+        self.waypoints = waypoints
         self.types = types
         self.scene_configs = scene_configs
 
@@ -119,6 +120,16 @@ class PedState:
         next_state = self.state
         next_state[:, 0:2] += desired_velocity * step_width_expanded
         next_state[:, 2:4] = desired_velocity
+
+        if self.waypoints is not None:
+            # ゴール到達判定
+            distances_to_goal = np.linalg.norm(next_state[:, 0:2] - next_state[:, 4:6], axis=-1)
+            reached_goal = distances_to_goal < 0.5  # 距離が0.5未満で到達と判定
+
+            # ゴールを更新
+            for i, reached in enumerate(reached_goal):
+                if reached and len(self.waypoints[i]) > 0:  # 中継地点が残っている場合
+                    next_state[i, 4:6] = self.waypoints[i].pop(0)  # 次のゴールに設定
         
         next_groups = self.groups
         if groups is not None:

@@ -84,8 +84,6 @@ class PedSpacePotential(object):
         self.obstacles = obstacles or []
         self.u0 = np.expand_dims(u0, axis=1)
         self.r = np.expand_dims(r, axis=1)
-        print("u0: ", self.u0)
-        print("r: ", self.r)
 
     def value_r_aB(self, r_aB):
         """Compute value parametrized with r_aB."""

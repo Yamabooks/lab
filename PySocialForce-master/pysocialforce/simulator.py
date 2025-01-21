@@ -36,7 +36,7 @@ class Simulator:
         Make one step
     """
 
-    def __init__(self, state, types=None, groups=None, obstacles=None, config_file=None):
+    def __init__(self, state, waypoints, types=None, groups=None, obstacles=None, config_file=None):
         # 設定を読み込む
         self.config = DefaultConfig()
         if config_file:
@@ -53,7 +53,7 @@ class Simulator:
         self.env = EnvState(obstacles, self.config("resolution", 50.0))
 
         # initiate agents
-        self.peds = PedState(state, types, groups, self.scene_configs)
+        self.peds = PedState(state, waypoints, types, groups, self.scene_configs)
 
         # construct forces
         self.forces = self.make_forces()
@@ -138,7 +138,7 @@ class Simulator:
 
             for group_force_class in group_forces_to_initialize:
                 group_force = group_force_class()
-                group_force.init(self, self.config)
+                group_force.init(self, self.force_configs, self.factor_list)
                 forces_list.append(group_force)
 
         #print("Force_list: ", forces_list)
@@ -150,7 +150,7 @@ class Simulator:
         """compute forces"""
         # self.forcesの各要素に指定された関数(get_force)を適用
         total_force = sum(map(lambda x: x.get_force(), self.forces))    # 各力を合計して計算
-        print(f"Total Force: {total_force}")
+        #print(f"Total Force: {total_force}")
         return total_force
     
     def get_states(self):
