@@ -5,7 +5,7 @@ import pysocialforce as psf
 from random import uniform, randint, choice
 
 if __name__ == "__main__":
-    """
+    
     # 歩行者の位置、速度、目標を次の形式で表します (px, py, vx, vy, gx, gy)
     # 歩行者の人数を指定
     num_pedestrians = 50
@@ -16,7 +16,7 @@ if __name__ == "__main__":
     types = []
     groups = []  # グループリスト
     groups = None
-
+    """
     for i in range(num_pedestrians):
         # スタートのy座標を10または-10に設定（ランダムに選択）
         start_y = uniform(0, 20)
@@ -65,7 +65,7 @@ if __name__ == "__main__":
     # px, py, vx, vy, gx, gy 
     initial_state = np.array(
         [
-            [0.0, 0.0, 0.5, 0.5, 5.0, 20.0],
+            [0.5, 2.5, 0.5, 0, 20.0, 2.5],
             #[1.0, 10, -0.5, -0.5, -1.0, -10.0],
             #[0.0, 0.0, 0.5, 0.5, 1.0, 10.0],
             #[1.0, 0.0, 0.5, 0.5, 2.0, 10.0],
@@ -82,17 +82,27 @@ if __name__ == "__main__":
     ]"""
     waypoints = None
 
-    """types = [0,]    # 0: 成人, 1: 老人, 2: 子供
+    types = [2,]    # 0: 成人, 1: 老人, 2: 子供
     # social groups informoation is represented as lists of indices of the state array
     groups = [[0],]
     #groups = None
-"""
     obs = [
-        [0, 0, 0, 5],     
-        [0, 0, 8, 12],     
-        [0, 0, 15, 20],    
+        [0, 0, 0, 5],
+
+        [5, 5, 0, 2.5],
+        [5, 5, 4.5, 5],
+
+        [10, 10, 0, 0.5],
+        [10, 10, 2.5, 5],
+
+        [14, 17, 1.5, 3.5],
+
+        [0, 10, 0, 0],
+        [0, 10, 5, 5],
     ]
     #obs = None
+
+    obstruction_area = [ 2, 3, 2, 3]
 
     # 確認用の出力
     print("Initial State: ", initial_state)
@@ -106,10 +116,11 @@ if __name__ == "__main__":
         types=types,
         groups=groups,
         obstacles=obs,
+        area = obstruction_area,
         config_file=Path(__file__).resolve().parent.joinpath("main.toml"),
     )
     
-    s.step(100)
+    s.step(200)
 
     with psf.utils.plot.SceneVisualizer(s, "output/animation") as sv:
         sv.animate()

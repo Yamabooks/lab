@@ -1,6 +1,7 @@
 """Utility functions for plots and animations."""
 
 from contextlib import contextmanager
+from matplotlib.patches import Rectangle
 
 import numpy as np
 
@@ -66,6 +67,7 @@ class SceneVisualizer:
         self, scene, output=None, writer="imagemagick", cmap="viridis", agent_colors=None, **kwargs
     ):
         self.scene = scene
+        self.peds = self.scene.peds
         self.states, self.group_states = self.scene.get_states()
         self.cmap = cmap
         self.agent_colors = agent_colors
@@ -97,12 +99,15 @@ class SceneVisualizer:
         """Main method for create plot"""
         self.plot_obstacles()
 
+        # 特定エリアを着色
+        self.plot_area()
+
         groups = self.group_states[0]  # static group for now
         if not groups:
             for ped in range(self.scene.peds.size()):
                 x = self.states[:, ped, 0]
                 y = self.states[:, ped, 1]
-                self.ax.plot(x, y, "-o", markersize=2.5, color="none")
+                self.ax.plot(x, y, "-o", label=f"ped {ped}", markersize=2.5)
         else:
             colors = plt.cm.rainbow(np.linspace(0, 1, len(groups)))
 
@@ -110,7 +115,7 @@ class SceneVisualizer:
                 for ped in group:
                     x = self.states[:, ped, 0]
                     y = self.states[:, ped, 1]
-                    self.ax.plot(x, y, "-o", label=f"ped {ped}", markersize=2.5, color="none") # color[i]
+                    self.ax.plot(x, y, "-o", label=f"ped {ped}", markersize=2.5, color="gray") #colors[i]
         self.ax.legend()
         return self.fig
 
@@ -149,8 +154,8 @@ class SceneVisualizer:
         xy_max = np.max(xy_limits[:, 2:4], axis=0) + margin
         self.ax.set(xlim=(xy_min[0], xy_max[0]), ylim=(xy_min[1], xy_max[1]))
         """
-        self.ax.set_xlim(-30, 30)
-        self.ax.set_ylim(0, 20)
+        self.ax.set_xlim(0, 20)
+        self.ax.set_ylim(0, 5)
 
         # # recompute the ax.dataLim
         # self.ax.relim()
@@ -182,7 +187,7 @@ class SceneVisualizer:
         """
 
         # タイプ別の色マッピング
-        type_colors = {0: "red", 1: "blue", 2: "lightgreen"}  # 0: adult, 1: elderly, 2: child
+        type_colors = {0: "red", 1: "blue", 2: "green"}  # 0: adult, 1: elderly, 2: child
 
         states, _ = self.scene.get_states()
         current_state = states[step]
@@ -223,6 +228,21 @@ class SceneVisualizer:
     def plot_obstacles(self):
         for s in self.scene.get_obstacles():
             self.ax.plot(s[:, 0], s[:, 1], "-o", color="black", markersize=2.5)
+
+    def plot_area(self):
+        area = self.peds.area
+        x_min, x_max, y_min, y_max = area
+        color = "red"
+        alpha = 0.5 # 透明度
+
+        rect = Rectangle(
+            (x_min, y_min),  # 左下の座標
+            x_max - x_min,   # 幅
+            y_max - y_min,   # 高さ
+            color=color,
+            alpha=alpha
+        )
+        self.ax.add_patch(rect)
 
     def animation_init(self):
         self.plot_obstacles()

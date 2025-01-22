@@ -9,7 +9,7 @@ from pysocialforce.utils import stateutils
 class PedState:
     """歩行者の位置、速度、目標地点、およびグループ情報を追跡"""
 
-    def __init__(self, state, waypoints, types, groups, scene_configs):
+    def __init__(self, state, waypoints, types, groups, area, scene_configs):
         """
         state: 初期状態（各歩行者の位置、速度、目標地点など）を保持するnumpy配列。
         types: 各歩行者のタイプ（0: 成人、1: 老人、2: 子供）。
@@ -18,6 +18,7 @@ class PedState:
         """
         self.waypoints = waypoints
         self.types = types
+        self.area = area
         self.scene_configs = scene_configs
 
         self.max_speeds = None
@@ -101,6 +102,10 @@ class PedState:
         desired_velocity = np.zeros_like(self.vel())  # 歩行者ごとの速度を保持
         step_width = np.zeros((self.size(),))
 
+        # エリア内での力調整
+        """if self.area is not None:
+            force = self.obstruction_area(self.pos(), self.types, force, self.area)
+"""
         for i, ped_type in enumerate(self.types):  # 各歩行者の種類に基づいて計算
             # 種類ごとの設定を取得
             config = self.scene_configs.get(str(ped_type))
@@ -136,6 +141,18 @@ class PedState:
             next_groups = groups
         
         self.update(next_state, next_groups)
+
+    # 特定エリアによって、速度を制限
+    def obstruction_area(self, pos, types, force, area):
+        x_min, x_max, y_min, y_max = area
+        reduction_factor = 0.5
+        adjusted_force = force.copy()  # 力のコピーを作成
+
+        for i, (x, y) in enumerate(pos):  # 各歩行者について処理
+            if x_min <= x <= x_max and y_min <= y <= y_max:
+                adjusted_force[i] *= reduction_factor  # 力を減少
+
+        return adjusted_force
 
     def initial_speeds(self):
         return stateutils.speeds(self.ped_states[0])

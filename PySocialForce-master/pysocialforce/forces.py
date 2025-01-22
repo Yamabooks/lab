@@ -49,7 +49,22 @@ class Force(ABC):
 class GoalAttractiveForce(Force):
     """accelerate to desired velocity"""
 
+    def __init__(self):
+        super().__init__()
+        self.initialized = False
+
+    def _initialize(self):
+        """初回呼び出し時に初期化"""
+        self.goal_factor = np.zeros((self.peds.size(),))
+        for i, ped_type in enumerate(self.peds.types):
+            config = self.config.get(str(ped_type), {}).get(camel_to_snake(type(self).__name__), {})
+            self.goal_factor[i] = self.factor_list.get(str(ped_type), {}).get(camel_to_snake(type(self).__name__), 1.0)
+        self.initialized = True
+
     def _get_force(self):
+        if not self.initialized:
+            self._initialize()  # 初回のみ初期化を実行
+
         F0 = (
             1.0
             / self.peds.tau()
@@ -58,70 +73,88 @@ class GoalAttractiveForce(Force):
                 - self.peds.vel()
             )
         )
-        return F0 * self.factor
+        return F0 * self.goal_factor
 
 
 class PedRepulsiveForce(Force):
     """Ped to ped repulsive force"""
-    def _get_force(self):
-        v0 = np.zeros((self.peds.size(),))
-        sigma = np.zeros((self.peds.size(),))
-        fov_phi = np.zeros((self.peds.size(),))
-        fov_factor = np.zeros((self.peds.size(),))
-        step_width = np.zeros((self.peds.size(),))
-        factors = np.zeros((self.peds.size(),))
-        scene_config = self.peds.scene_configs
+
+    def __init__(self):
+        super().__init__()
+        self.initialized = False
+
+    def _initialize(self):
+        """初回呼び出し時に初期化"""
+        self.v0 = np.zeros((self.peds.size(),))
+        self.sigma = np.zeros((self.peds.size(),))
+        self.fov_phi = np.zeros((self.peds.size(),))
+        self.fov_factor = np.zeros((self.peds.size(),))
+        self.step_width = np.zeros((self.peds.size(),))
+        self.ped_factors = np.zeros((self.peds.size(),))
 
         for i, ped_type in enumerate(self.peds.types):
             config = self.config.get(str(ped_type), {}).get(camel_to_snake(type(self).__name__), {})
-            v0[i] = config.get("v0", 2.1)
-            sigma[i] = config.get("sigma", 0.3)
-            fov_phi[i] = config.get("fov_phi", 100.0)
-            fov_factor[i] = config.get("fov_factor", 0.5)
-            step_width[i] = scene_config.get(str(ped_type)).get("scene").get("step_width")
-            factors[i] = self.factor_list.get(str(ped_type), {}).get(camel_to_snake(type(self).__name__), 1.0)
+            self.v0[i] = config.get("v0", 2.1)
+            self.sigma[i] = config.get("sigma", 0.3)
+            self.fov_phi[i] = config.get("fov_phi", 100.0)
+            self.fov_factor[i] = config.get("fov_factor", 0.5)
+            self.step_width[i] = self.peds.scene_configs.get(str(ped_type), {}).get("scene", {}).get("step_width")
+            self.ped_factors[i] = self.factor_list.get(str(ped_type), {}).get(camel_to_snake(type(self).__name__), 1.0)
 
-        potential_func = PedPedPotential(step_width, v0, sigma)
+        self.initialized = True
+
+    def _get_force(self):
+        if not self.initialized:
+            self._initialize()  # 初回のみ初期化を実行
+
+        potential_func = PedPedPotential(self.step_width, self.v0, self.sigma)
         f_ab = -1.0 * potential_func.grad_r_ab(self.peds.state)
 
-        fov = FieldOfView(fov_phi, fov_factor)
+        fov = FieldOfView(self.fov_phi, self.fov_factor)
         w = np.expand_dims(fov(self.peds.desired_directions(), -f_ab), -1)
-        
+
         F_ab = w * f_ab
 
-        factors_expanded = factors[:, None]
-        forces = np.sum(F_ab, axis=1) * factors_expanded
+        forces = np.sum(F_ab, axis=1) * self.ped_factors[:, None]
 
-        #print("PedRepulsive: ",forces)
         return forces
+
 
 class SpaceRepulsiveForce(Force):
     """obstacles to ped repulsive force"""
-    def _get_force(self):
-        u0 = np.zeros((self.peds.size(),))
-        r = np.zeros((self.peds.size(),))
-        factors = np.zeros((self.peds.size(),))
+
+    def __init__(self):
+        super().__init__()
+        self.initialized = False
+
+    def _initialize(self):
+        """初回呼び出し時に初期化"""
+        self.u0 = np.zeros((self.peds.size(),))
+        self.r = np.zeros((self.peds.size(),))
+        self.spa_factors = np.zeros((self.peds.size(),))
 
         for i, ped_type in enumerate(self.peds.types):
             config = self.config.get(str(ped_type), {}).get(camel_to_snake(type(self).__name__), {})
-            u0[i] = config.get("u0", 10)
-            r[i] = config.get("r", 0.2)
-            factors[i] = self.factor_list.get(str(ped_type), {}).get(camel_to_snake(type(self).__name__), 1.0)
+            self.u0[i] = config.get("u0", 10)
+            self.r[i] = config.get("r", 0.2)
+            self.spa_factors[i] = self.factor_list.get(str(ped_type), {}).get(camel_to_snake(type(self).__name__), 1.0)
 
-        # 力の計算
+        self.initialized = True
+
+    def _get_force(self):
+        if not self.initialized:
+            self._initialize()  # 初回のみ初期化を実行
+
         if self.scene.get_obstacles() is None:
             F_aB = np.zeros((self.peds.size(), 0, 2))
         else:
-            potential_func = PedSpacePotential(
-                self.scene.get_obstacles(), u0, r
-                )
+            potential_func = PedSpacePotential(self.scene.get_obstacles(), self.u0, self.r)
             F_aB = -1.0 * potential_func.grad_r_aB(self.peds.state)
-        
-        factors_expanded = factors[:, None]
-        forces = np.sum(F_aB, axis=1) * factors_expanded
 
-        #print("SpaceRepulsive: ", forces)
+        forces = np.sum(F_aB, axis=1) * self.spa_factors[:, None]
+
         return forces
+
 
 class GroupCoherenceForce(Force):
     """Group coherence force, paper version"""
@@ -246,7 +279,7 @@ class GroupGazeForce(Force):
 
 class GroupGazeForceAlt(Force):
     """Group gaze force"""
-
+    
     def _get_force(self):
         forces = np.zeros((self.peds.size(), 2))
 
@@ -291,56 +324,84 @@ class GroupGazeForceAlt(Force):
 class DesiredForce(Force):
     """Calculates the force between this agent and the next assigned waypoint."""
 
+    def __init__(self):
+        super().__init__()
+        self.initialized = False
+        self.relaxation_time = None
+        self.goal_threshold = None
+        self.des_factors = None
+
+    def _initialize(self):
+        """初回呼び出し時に初期化"""
+        self.relaxation_time = np.zeros((self.peds.size(),))
+        self.goal_threshold = np.zeros((self.peds.size(),))
+        self.des_factors = np.zeros((self.peds.size(),))
+
+        for i, ped_type in enumerate(self.peds.types):
+            config = self.config.get(str(ped_type), {}).get(camel_to_snake(type(self).__name__), {})
+            self.relaxation_time[i] = config.get("relaxation_time", 0.5)
+            self.goal_threshold[i] = config.get("goal_threshold", 0.2)
+            self.des_factors[i] = self.factor_list.get(str(ped_type), {}).get(camel_to_snake(type(self).__name__), 1.0)
+
+        self.initialized = True  # 初期化フラグをセット
+
     def _get_force(self):
+        if not self.initialized:
+            self._initialize()  # 初回のみ初期化を実行
+
         pos = self.peds.pos()
         vel = self.peds.vel()
         goal = self.peds.goal()
 
         direction, dist = stateutils.normalize(goal - pos)
-        
-        max_speeds = self.peds.max_speeds
         forces = np.zeros((self.peds.size(), 2))
 
-        # 力を計算
-        for i, ped_type in enumerate(self.peds.types):
-            config = self.config.get(str(ped_type)).get(camel_to_snake(type(self).__name__))
-            relaxation_time = config.get("relaxation_time", 0.5)
-            goal_threshold = config.get("goal_threshold", 0.2)
-
-            if dist[i] > goal_threshold:
-                force = (direction[i] * max_speeds[i] - vel[i]) / relaxation_time
+        for i in range(self.peds.size()):
+            if dist[i] > self.goal_threshold[i]:
+                force = (direction[i] * self.peds.max_speeds[i] - vel[i]) / self.relaxation_time[i]
             else:
-                force = -1.0 * vel[i] / relaxation_time
-            
-            factor = self.factor_list.get(str(ped_type), {}).get(camel_to_snake(type(self).__name__), 1.0)
-            forces[i] = force * factor
+                force = -1.0 * vel[i] / self.relaxation_time[i]
 
-        #print(f"Forces[{camel_to_snake(type(self).__name__)}]: ", forces)
+            forces[i] = force * self.des_factors[i]
 
         return forces
 
 class SocialForce(Force):
     """Calculates the social force between this agent and all the other agents."""
 
-    def _get_force(self):
+    def __init__(self):
+        super().__init__()
+        self.initialized = False  # 初期化フラグ
+        self.lambda_importance = None
+        self.gamma = None
+        self.n = None
+    
+    def _initialize(self):
         # 配列を初期化
-        lambda_importance = np.zeros((self.peds.size(),))
-        gamma = np.zeros((self.peds.size(),))
-        n = np.zeros((self.peds.size(),))
-        n_prime = np.zeros((self.peds.size(),))
-        factors = np.zeros((self.peds.size(),))
-
-        pos = self.peds.pos()
-        vel = self.peds.vel()
+        self.lambda_importance = np.zeros((self.peds.size(),))
+        self.gamma = np.zeros((self.peds.size(),))
+        self.n = np.zeros((self.peds.size(),))
+        self.n_prime = np.zeros((self.peds.size(),))
+        self.soc_factors = np.zeros((self.peds.size(),))
 
         # 種類に応じた設定を取得
         for i, ped_type in enumerate(self.peds.types):
             config = self.config.get(str(ped_type), {}).get(camel_to_snake(type(self).__name__), {})
-            lambda_importance[i] = config.get("lambda_importance", 2.0)
-            gamma[i] = config.get("gamma", 0.35)
-            n[i] = config.get("n", 2)
-            n_prime[i] = config.get("n_prime", 3)
-            factors[i] = self.factor_list.get(str(ped_type), {}).get(camel_to_snake(type(self).__name__), 1.0)
+            self.lambda_importance[i] = config.get("lambda_importance", 2.0)
+            self.gamma[i] = config.get("gamma", 0.35)
+            self.n[i] = config.get("n", 2)
+            self.n_prime[i] = config.get("n_prime", 3)
+            self.soc_factors[i] = self.factor_list.get(str(ped_type), {}).get(camel_to_snake(type(self).__name__), 1.0)
+
+        self.initialized = True  # 初期化完了
+
+    def _get_force(self):
+
+        if not self.initialized:
+            self._initialize()  # 初回のみ初期化を実行
+            
+        pos = self.peds.pos()
+        vel = self.peds.vel()
         
         # 歩行者間の相互作用を計算
         pos_diff = stateutils.each_diff(pos)  # 位置差
@@ -348,7 +409,7 @@ class SocialForce(Force):
         vel_diff = -1.0 * stateutils.each_diff(vel)  # 速度差
 
         # lambda_importance を vel_diff の形状に拡張
-        lambda_expanded = np.repeat(lambda_importance, vel_diff.shape[0] // lambda_importance.shape[0])
+        lambda_expanded = np.repeat(self.lambda_importance, vel_diff.shape[0] // self.lambda_importance.shape[0])
         lambda_expanded = lambda_expanded.reshape(-1, 1)  # (6, 1)
 
         # vel_diff の形状に合わせる
@@ -362,11 +423,11 @@ class SocialForce(Force):
         theta = stateutils.vector_angles(interaction_direction) - stateutils.vector_angles(
             diff_direction
         )
-        gamma_expanded = np.repeat(gamma, len(interaction_length) // len(gamma))
+        gamma_expanded = np.repeat(self.gamma, len(interaction_length) // len(self.gamma))
         B = gamma_expanded * interaction_length
 
-        n_prime_expanded = np.repeat(n_prime, len(B) // len(n_prime))
-        n_expanded = np.repeat(n, len(B) // len(n))
+        n_prime_expanded = np.repeat(self.n_prime, len(B) // len(self.n_prime))
+        n_expanded = np.repeat(self.n, len(B) // len(self.n))
   
         # 力の計算
         force_velocity_amount = np.exp(-1.0 * diff_length / B - np.square(n_prime_expanded * B * theta))
@@ -382,7 +443,7 @@ class SocialForce(Force):
         force = force_velocity + force_angle
         force = np.sum(force.reshape((self.peds.size(), -1, 2)), axis=1)
         
-        factors_expanded = factors[:, None]
+        factors_expanded = self.soc_factors[:, None]
         forces = force * factors_expanded
 
         #print(f"Forces[{camel_to_snake(type(self).__name__)}]: ", forces)
@@ -392,24 +453,37 @@ class SocialForce(Force):
 class ObstacleForce(Force):
     """Calculates the force between this agent and the nearest obstacle in this scene."""
 
+    def __init__(self):
+        super().__init__()
+        self.initialized = False  # 初期化フラグ
+        self.sigma = None
+        self.threshold = None
+        self.agent_radius = None
+        self.factors = None
+
+    def _initialize(self):
+        """初回呼び出し時に初期化"""
+        self.sigma = np.zeros((self.peds.size(),))
+        self.threshold = np.zeros((self.peds.size(),))
+        self.agent_radius = np.zeros((self.peds.size(),))
+        self.factors = np.zeros((self.peds.size(),))
+
+        for i, ped_type in enumerate(self.peds.types):
+            config = self.config.get(str(ped_type), {}).get(camel_to_snake(type(self).__name__), {})
+            self.sigma[i] = config.get("sigma", 0.2)
+            self.threshold[i] = config.get("threshold", 3.0)
+            self.agent_radius[i] = self.peds.get_agent_radius(ped_type)
+            self.factors[i] = self.factor_list.get(str(ped_type), {}).get(camel_to_snake(type(self).__name__), 1.0)
+
+        self.initialized = True  # 初期化完了
+
     def _get_force(self):
-        sigma = np.zeros((self.peds.size(),))
-        threshold = np.zeros((self.peds.size(),))
-        agent_radius = np.zeros((self.peds.size(),))
-        factors = np.zeros((self.peds.size(),))
+        if not self.initialized:
+            self._initialize()  # 初回のみ初期化を実行
 
         pos = self.peds.pos()
-        
-        # 種類に応じた設定を取得
-        for i, ped_type in enumerate(self.peds.types):
-            config = self.config.get(str(ped_type), {}).get(camel_to_snake(type(self).__name__))
-            sigma[i] = config.get("sigma", 0.2)
-            threshold[i] = config.get("threshold", 3.0)
-            agent_radius[i] = self.peds.get_agent_radius(ped_type)
-            factors[i] = self.factor_list.get(str(ped_type), {}).get(camel_to_snake(type(self).__name__), 1.0)
-
-        # 初期化
         force = np.zeros((self.peds.size(), 2))
+
         if len(self.scene.get_obstacles()) == 0:
             return force
 
@@ -419,16 +493,14 @@ class ObstacleForce(Force):
         for i, p in enumerate(pos):
             diff = p - obstacles
             directions, dist = stateutils.normalize(diff)
-            dist = dist - agent_radius[i]
-            if np.all(dist >= threshold[i]):
+            dist = dist - self.agent_radius[i]
+            if np.all(dist >= self.threshold[i]):
                 continue
-            dist_mask = dist < threshold[i]
-            directions[dist_mask] *= np.exp(-dist[dist_mask].reshape(-1, 1) / sigma[i])
+            dist_mask = dist < self.threshold[i]
+            directions[dist_mask] *= np.exp(-dist[dist_mask].reshape(-1, 1) / self.sigma[i])
             force[i] = np.sum(directions[dist_mask], axis=0)
 
-        factors_expanded = factors[:, None]
+        factors_expanded = self.factors[:, None]
         forces = force * factors_expanded
-
-        #print(f"Forces[{camel_to_snake(type(self).__name__)}]: ", forces)
 
         return forces

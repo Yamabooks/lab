@@ -36,7 +36,7 @@ class Simulator:
         Make one step
     """
 
-    def __init__(self, state, waypoints, types=None, groups=None, obstacles=None, config_file=None):
+    def __init__(self, state, waypoints=None, types=None, groups=None, obstacles=None, area = None, config_file=None):
         # 設定を読み込む
         self.config = DefaultConfig()
         if config_file:
@@ -53,7 +53,7 @@ class Simulator:
         self.env = EnvState(obstacles, self.config("resolution", 50.0))
 
         # initiate agents
-        self.peds = PedState(state, waypoints, types, groups, self.scene_configs)
+        self.peds = PedState(state, waypoints, types, groups, area, self.scene_configs)
 
         # construct forces
         self.forces = self.make_forces()

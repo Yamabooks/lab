@@ -82,9 +82,9 @@ n = 2
 n_prime = 3
 
 [types.0.forces.obstacle_force]
-factor = 10.0
+factor = 3.0
 sigma = 0.2
-threshold = 3.0
+threshold = 5.0
 
 # 老人 (type=1)
 [types.1.scene]
@@ -121,9 +121,9 @@ n = 2
 n_prime = 3
 
 [types.1.forces.obstacle_force]
-factor = 8.0
-sigma = 0.3
-threshold = 2.5
+factor = 3.0
+sigma = 0.2
+threshold = 3.0
 
 # 子供 (type=2)
 [types.2.scene]
@@ -160,6 +160,6 @@ n = 3
 n_prime = 4
 
 [types.2.forces.obstacle_force]
-factor = 6.0
+factor = 2.0
 sigma = 0.2
-threshold = 2.0 
+threshold = 4.0 
