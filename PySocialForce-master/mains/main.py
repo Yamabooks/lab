@@ -65,10 +65,10 @@ if __name__ == "__main__":
     # px, py, vx, vy, gx, gy 
     initial_state = np.array(
         [
+            #[0.5, 2.5, 0.5, 0, 20.0, 2.5],
+            [0.5, 1.0, 0.5, 0, 20.0, 1.0],
             [0.5, 2.5, 0.5, 0, 20.0, 2.5],
-            #[1.0, 10, -0.5, -0.5, -1.0, -10.0],
-            #[0.0, 0.0, 0.5, 0.5, 1.0, 10.0],
-            #[1.0, 0.0, 0.5, 0.5, 2.0, 10.0],
+            [0.5, 4.0, 0.5, 0, 20.0, 4.0],
             #[2.0, 10, -0.5, -0.5, 3.0, 0.0],
             #[3.0, 0.0, 0.5, 0.5, 4.0, 10.0],
         ]
@@ -82,27 +82,44 @@ if __name__ == "__main__":
     ]"""
     waypoints = None
 
-    types = [2,]    # 0: 成人, 1: 老人, 2: 子供
+    types = [2, 1, 0]    # 0: 成人, 1: 老人, 2: 子供
     # social groups informoation is represented as lists of indices of the state array
-    groups = [[0],]
-    #groups = None
+    groups = [[0]]
+    groups = None
+    
     obs = [
-        [0, 0, 0, 5],
+        #[0, 0, 0, 5],
 
-        [5, 5, 0, 2.5],
-        [5, 5, 4.5, 5],
+        #[5, 5, 0, 2.5],
+        #[5, 5, 4.5, 5],
 
-        [10, 10, 0, 0.5],
-        [10, 10, 2.5, 5],
+        #[10, 10, 0, 0.5],
+        #[10, 10, 2.5, 5],
 
-        [14, 17, 1.5, 3.5],
+        #[14, 17, 1.5, 3.5],
 
-        [0, 10, 0, 0],
-        [0, 10, 5, 5],
+        #[0, 10, 0, 0],
+        #[0, 10, 5, 5],
     ]
     #obs = None
 
-    obstruction_area = [ 2, 3, 2, 3]
+    obstruction_area = [
+        [2.5, 5, 0, 5, 0.5],
+        [10, 12.5, 0, 5, 0.5],
+        ]
+    # obstrunction_area = None
+
+    # x_min,x_max,y_min,y_max,x_temp,y_temp
+    sign_area = [
+        [11, 13, 0.5, 2.5, 14, 0.3],
+        ]
+    sign_area = None
+
+    sign_goal = {
+        "goal0": [[1, 2, 3], [4, 5, 6]],
+        #"goal1": [[7, 8, 9], [10, 11, 12]],
+        #"goal2": [[13, 14, 15], [16, 17, 18]],
+    }
 
     # 確認用の出力
     print("Initial State: ", initial_state)
@@ -116,7 +133,9 @@ if __name__ == "__main__":
         types=types,
         groups=groups,
         obstacles=obs,
-        area = obstruction_area,
+        obs_area = obstruction_area,
+        sgn_area = sign_area,
+        sgn_goal = sign_goal,
         config_file=Path(__file__).resolve().parent.joinpath("main.toml"),
     )
     

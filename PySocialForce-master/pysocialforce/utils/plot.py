@@ -100,7 +100,10 @@ class SceneVisualizer:
         self.plot_obstacles()
 
         # 特定エリアを着色
-        self.plot_area()
+        if self.peds.obs_area is not None:
+            self.plot_obs_area()
+        if self.peds.sgn_area is not None:
+            self.plot_sgn_area()
 
         groups = self.group_states[0]  # static group for now
         if not groups:
@@ -229,20 +232,39 @@ class SceneVisualizer:
         for s in self.scene.get_obstacles():
             self.ax.plot(s[:, 0], s[:, 1], "-o", color="black", markersize=2.5)
 
-    def plot_area(self):
-        area = self.peds.area
-        x_min, x_max, y_min, y_max = area
-        color = "red"
-        alpha = 0.5 # 透明度
+    def plot_obs_area(self):
+        obs_area = self.peds.obs_area
+        for i, area in enumerate(obs_area):
 
-        rect = Rectangle(
-            (x_min, y_min),  # 左下の座標
-            x_max - x_min,   # 幅
-            y_max - y_min,   # 高さ
-            color=color,
-            alpha=alpha
-        )
-        self.ax.add_patch(rect)
+            x_min, x_max, y_min, y_max, scalr = area
+            color = "red"
+            alpha = 0.3 # 透明度
+
+            rect = Rectangle(
+                (x_min, y_min),  # 左下の座標
+                x_max - x_min,   # 幅
+                y_max - y_min,   # 高さ
+                color=color,
+                alpha=alpha
+            )
+            self.ax.add_patch(rect)
+    
+    def plot_sgn_area(self):
+        sgn_area = self.peds.sgn_area
+        for i, area in enumerate(sgn_area):
+            area = area[:4]
+            x_min, x_max, y_min, y_max = area
+            color = "lightgreen"
+            alpha = 0.5 # 透明度
+
+            rect = Rectangle(
+                (x_min, y_min),  # 左下の座標
+                x_max - x_min,   # 幅
+                y_max - y_min,   # 高さ
+                color=color,
+                alpha=alpha
+            )
+            self.ax.add_patch(rect)
 
     def animation_init(self):
         self.plot_obstacles()

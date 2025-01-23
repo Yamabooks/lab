@@ -36,7 +36,7 @@ class Simulator:
         Make one step
     """
 
-    def __init__(self, state, waypoints=None, types=None, groups=None, obstacles=None, area = None, config_file=None):
+    def __init__(self, state, waypoints=None, types=None, groups=None, obstacles=None, obs_area = None, sgn_area=None, sgn_goal=None, config_file=None):
         # 設定を読み込む
         self.config = DefaultConfig()
         if config_file:
@@ -44,6 +44,8 @@ class Simulator:
             
         # typeごとの設定を保持
         self.types = types # 0: adult, 1: elderly, 2: child
+        
+        self.sgn_area = sgn_area
 
         self.scene_configs = self.get_scene_configs(self.types, self.config)
         
@@ -53,7 +55,7 @@ class Simulator:
         self.env = EnvState(obstacles, self.config("resolution", 50.0))
 
         # initiate agents
-        self.peds = PedState(state, waypoints, types, groups, area, self.scene_configs)
+        self.peds = PedState(state, waypoints, types, groups, obs_area, sgn_area, self.scene_configs)
 
         # construct forces
         self.forces = self.make_forces()
@@ -148,11 +150,31 @@ class Simulator:
     # self.forcesに格納されたすべての力(Desired,social,...)を呼び出して計算
     def compute_forces(self):
         """compute forces"""
+        if self.sgn_area is not None:
+            self.sign_area()
         # self.forcesの各要素に指定された関数(get_force)を適用
         total_force = sum(map(lambda x: x.get_force(), self.forces))    # 各力を合計して計算
-        #print(f"Total Force: {total_force}")
+        print(f"Total Force: {total_force}")
         return total_force
     
+    # 特定エリアによって、ゴールを変更
+    def sign_area(self):
+        """signエリア内で一時的なゴールを設定"""
+        for i, ped_pos in enumerate(self.peds.pos()):
+            for sign in self.sgn_area:
+                x_min, x_max, y_min, y_max, x_temp, y_temp = sign
+
+                # 歩行者が指定されたエリア内にいる場合
+                if x_min <= ped_pos[0] <= x_max and y_min <= ped_pos[1] <= y_max:
+                    if not self.peds.is_temporary_goal(i):  # 一時ゴールが設定されていない場合
+                        self.peds.set_temporary_goal(i, [x_temp, y_temp])  # 一時ゴールを設定
+                        break  # 一つのsignエリアだけ処理する
+            else:
+                # 一時ゴールに到達している場合は元のゴールに戻す
+                if self.peds.reached_temporary_goal(i):
+                    self.peds.restore_original_goal(i)
+
+
     def get_states(self):
         """Expose whole state"""
         return self.peds.get_states()

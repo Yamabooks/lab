@@ -162,4 +162,4 @@ n_prime = 4
 [types.2.forces.obstacle_force]
 factor = 2.0
 sigma = 0.2
-threshold = 4.0 
+threshold = 4.0

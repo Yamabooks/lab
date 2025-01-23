@@ -9,7 +9,7 @@ from pysocialforce.utils import stateutils
 class PedState:
     """歩行者の位置、速度、目標地点、およびグループ情報を追跡"""
 
-    def __init__(self, state, waypoints, types, groups, area, scene_configs):
+    def __init__(self, state, waypoints, types, groups, obs_area, sgn_area, scene_configs):
         """
         state: 初期状態（各歩行者の位置、速度、目標地点など）を保持するnumpy配列。
         types: 各歩行者のタイプ（0: 成人、1: 老人、2: 子供）。
@@ -18,7 +18,9 @@ class PedState:
         """
         self.waypoints = waypoints
         self.types = types
-        self.area = area
+        self.obs_area = obs_area
+        self.sgn_area = sgn_area
+        
         self.scene_configs = scene_configs
 
         self.max_speeds = None
@@ -31,6 +33,9 @@ class PedState:
         self.max_speed_multiplier = self.scene_configs.get('0', {}).get('scene', {}).get('max_speed_multiplier', 1.3)
 
         self.update(state, groups)
+
+        self.original_goals = np.copy(self.state[:, 4:6])
+        self.temporary_goals = np.full_like(self.original_goals, np.nan)  # 一時ゴール（初期値は無効）
 
     def update(self, state, groups):
         # タイプごとの初期化処理
@@ -102,14 +107,15 @@ class PedState:
         desired_velocity = np.zeros_like(self.vel())  # 歩行者ごとの速度を保持
         step_width = np.zeros((self.size(),))
 
-        # エリア内での力調整
-        """if self.area is not None:
-            force = self.obstruction_area(self.pos(), self.types, force, self.area)
-"""
         for i, ped_type in enumerate(self.types):  # 各歩行者の種類に基づいて計算
             # 種類ごとの設定を取得
+            pos = self.pos()[i]
             config = self.scene_configs.get(str(ped_type))
             step_width[i] = config.get("scene").get("step_width")
+
+            # 特定エリア内での力調整
+            if self.obs_area is not None:
+                step_width[i] = self.obstruction_area(step_width[i], pos, ped_type, self.obs_area)
 
             # 理想速度を計算
             velocity = self.vel()[i] + step_width[i] * force[i]
@@ -143,17 +149,40 @@ class PedState:
         self.update(next_state, next_groups)
 
     # 特定エリアによって、速度を制限
-    def obstruction_area(self, pos, types, force, area):
-        x_min, x_max, y_min, y_max = area
-        reduction_factor = 0.5
-        adjusted_force = force.copy()  # 力のコピーを作成
+    def obstruction_area(self, step_width, pos, ped_type, obs_area):
+        reduction_steps = [0.2, 0.1, 0.15]
+        step_width = step_width
+        x, y = pos
+        for i, area in enumerate(obs_area):
+            x_min, x_max, y_min, y_max, scalr = area
 
-        for i, (x, y) in enumerate(pos):  # 各歩行者について処理
             if x_min <= x <= x_max and y_min <= y <= y_max:
-                adjusted_force[i] *= reduction_factor  # 力を減少
+                step_width *= scalr
+                break
 
-        return adjusted_force
+        return step_width
+    
+    def is_temporary_goal(self, idx):
+        """一時ゴールが設定されているか確認"""
+        return not np.isnan(self.temporary_goals[idx, 0])
 
+    def set_temporary_goal(self, idx, goal):
+        """一時ゴールを設定"""
+        self.temporary_goals[idx] = goal
+        self.state[idx, 4:6] = goal  # ゴールを一時的に変更
+
+    def restore_original_goal(self, idx):
+        """元のゴールに戻す"""
+        self.state[idx, 4:6] = self.original_goals[idx]
+        self.temporary_goals[idx] = np.nan  # 一時ゴールを無効化
+
+    def reached_temporary_goal(self, idx):
+        """一時ゴールに到達しているか確認"""
+        goal = self.temporary_goals[idx]
+        if np.isnan(goal[0]):
+            return False  # 一時ゴールが設定されていない場合
+        return np.linalg.norm(self.pos()[idx] - goal) < 0.5  # 到達判定（距離が0.5未満）
+    
     def initial_speeds(self):
         return stateutils.speeds(self.ped_states[0])
 
