@@ -197,34 +197,23 @@ class SceneVisualizer:
 
         states, _ = self.scene.get_states()
         current_state = states[step]
-        goals = self.scene.peds.goals  # ゴール位置を取得
-        radius = [0.2] * current_state.shape[0]
-        removal_indices = []  # ゴール到達した歩行者のインデックス
 
+        # radius = 0.2 + np.linalg.norm(current_state[:, 2:4], axis=-1) / 2.0 * 0.3
+        radius = [0.2] * current_state.shape[0]
         if self.human_actors:
             for i, human in enumerate(self.human_actors):
-                # ゴールに到達しているか判定
-                distance_to_goal = np.linalg.norm(current_state[i, :2] - goals[i])
-                if distance_to_goal < 0.5:  # ゴール判定の閾値 (0.5m)
-                    removal_indices.append(i)
-                else:
-                    # ゴールに到達していない場合は通常の更新
-                    human.center = current_state[i, :2]
-                    human.set_radius(0.2)
+                human.center = current_state[i, :2]
+                human.set_radius(0.2)
+                # human.set_radius(radius[i])
         else:
             self.human_actors = [
                 Circle(pos, radius=r) for pos, r in zip(current_state[:, :2], radius)
             ]
         
-        # 歩行者の色を設定
+        # 各歩行者の色を設定
         colors = [type_colors[self.scene.peds.types[i]] for i in range(current_state.shape[0])]
         self.human_collection.set_paths(self.human_actors)
         self.human_collection.set_facecolor(colors)  # タイプ別の色を設定
-
-        # ゴール到達後の歩行者を削除
-        for idx in sorted(removal_indices, reverse=True):  # インデックスを逆順で削除
-            del self.human_actors[idx]
-
 
     def plot_groups(self, step=-1):
         """Generate patches for groups

@@ -206,6 +206,7 @@ class Simulator:
     # 指定回数文ループを回す
     def step(self, n=1):
         """Step n time"""
-        for _ in range(n):
+        for i in range(n):
             self.step_once()
+            print(f"step{i}")
         return self

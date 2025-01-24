@@ -140,11 +140,13 @@ class PedState:
                 current_goal = next_state[i, 4:6]
                 distance_to_goal = np.linalg.norm(current_pos - current_goal)
 
-                # ゴールに到達した場合、次の中継地点を設定
-                if distance_to_goal < 0.5:  # 到達判定のしきい値
+                if distance_to_goal < 0.5:  # ゴールに到達した場合
                     if waypoints:  # 中継地点が残っている場合
-                        next_state[i, 4:6] = waypoints.pop(0)  # 次の目的地に設定
-        
+                        next_state[i, 4:6] = waypoints.pop(0)  # 次の目的地を設定
+                    else:  # 中継地点がない場合、スタート地点に戻す
+                        next_state[i, 0:2] = self.original_goals[i]  # スタート地点に戻す
+                        next_state[i, 4:6] = self.original_goals[i]  # 次のゴールをスタート地点に設定
+            
         next_groups = self.groups
         if groups is not None:
             next_groups = groups
