@@ -41,10 +41,13 @@ class Simulator:
         self.config = DefaultConfig()
         if config_file:
             self.config.load_config(config_file)
-            
+        
         # typeごとの設定を保持
         self.types = types # 0: adult, 1: elderly, 2: child
-        
+
+        if waypoints is not None:
+            state, waypoints = self.load_waypoints(state, waypoints)
+
         self.sgn_area = sgn_area
 
         self.scene_configs = self.get_scene_configs(self.types, self.config)
@@ -76,6 +79,16 @@ class Simulator:
                 scene_configs[str(i)] = {"scene": scene_config}
 
         return scene_configs
+    
+    def load_waypoints(self, state, waypoints):
+        for i, ped_type in enumerate(self.types):  # 各歩行者について処理
+            goal = state[i, 4:6].tolist()  # 現在のゴール地点を取得
+            
+            first_goal = waypoints[i].pop(0)
+            state[i, 4:6] = first_goal  # 最初の中継地点を次のゴールに設定
+            waypoints[i].append(goal)  # 現在のゴール地点をリストの末尾に追加
+
+        return state, waypoints
     
     # configからtypeごとのforceを抜き出す
     def get_force_configs(self, types, config):
@@ -154,7 +167,7 @@ class Simulator:
             self.sign_area()
         # self.forcesの各要素に指定された関数(get_force)を適用
         total_force = sum(map(lambda x: x.get_force(), self.forces))    # 各力を合計して計算
-        print(f"Total Force: {total_force}")
+        #print(f"Total Force: {total_force}")
         return total_force
     
     # 特定エリアによって、ゴールを変更
@@ -173,7 +186,6 @@ class Simulator:
                 # 一時ゴールに到達している場合は元のゴールに戻す
                 if self.peds.reached_temporary_goal(i):
                     self.peds.restore_original_goal(i)
-
 
     def get_states(self):
         """Expose whole state"""

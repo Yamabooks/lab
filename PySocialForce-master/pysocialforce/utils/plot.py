@@ -110,7 +110,7 @@ class SceneVisualizer:
             for ped in range(self.scene.peds.size()):
                 x = self.states[:, ped, 0]
                 y = self.states[:, ped, 1]
-                self.ax.plot(x, y, "-o", label=f"ped {ped}", markersize=2.5)
+                #self.ax.plot(x, y, "-o", label=f"ped {ped}", markersize=2.5)
         else:
             colors = plt.cm.rainbow(np.linspace(0, 1, len(groups)))
 
@@ -157,8 +157,11 @@ class SceneVisualizer:
         xy_max = np.max(xy_limits[:, 2:4], axis=0) + margin
         self.ax.set(xlim=(xy_min[0], xy_max[0]), ylim=(xy_min[1], xy_max[1]))
         """
-        self.ax.set_xlim(0, 20)
-        self.ax.set_ylim(0, 5)
+        self.ax.set_xlim(0, 50)
+        self.ax.set_ylim(0, 50)
+
+        #self.ax.set_xlim(0, 60)
+        #self.ax.set_ylim(0, 20)
 
         # # recompute the ax.dataLim
         # self.ax.relim()
@@ -194,22 +197,34 @@ class SceneVisualizer:
 
         states, _ = self.scene.get_states()
         current_state = states[step]
-        # radius = 0.2 + np.linalg.norm(current_state[:, 2:4], axis=-1) / 2.0 * 0.3
+        goals = self.scene.peds.goals  # ゴール位置を取得
         radius = [0.2] * current_state.shape[0]
+        removal_indices = []  # ゴール到達した歩行者のインデックス
+
         if self.human_actors:
             for i, human in enumerate(self.human_actors):
-                human.center = current_state[i, :2]
-                human.set_radius(0.2)
-                # human.set_radius(radius[i])
+                # ゴールに到達しているか判定
+                distance_to_goal = np.linalg.norm(current_state[i, :2] - goals[i])
+                if distance_to_goal < 0.5:  # ゴール判定の閾値 (0.5m)
+                    removal_indices.append(i)
+                else:
+                    # ゴールに到達していない場合は通常の更新
+                    human.center = current_state[i, :2]
+                    human.set_radius(0.2)
         else:
             self.human_actors = [
                 Circle(pos, radius=r) for pos, r in zip(current_state[:, :2], radius)
             ]
         
-        # 各歩行者の色を設定
+        # 歩行者の色を設定
         colors = [type_colors[self.scene.peds.types[i]] for i in range(current_state.shape[0])]
         self.human_collection.set_paths(self.human_actors)
         self.human_collection.set_facecolor(colors)  # タイプ別の色を設定
+
+        # ゴール到達後の歩行者を削除
+        for idx in sorted(removal_indices, reverse=True):  # インデックスを逆順で削除
+            del self.human_actors[idx]
+
 
     def plot_groups(self, step=-1):
         """Generate patches for groups
@@ -230,14 +245,19 @@ class SceneVisualizer:
 
     def plot_obstacles(self):
         for s in self.scene.get_obstacles():
-            self.ax.plot(s[:, 0], s[:, 1], "-o", color="black", markersize=2.5)
+            self.ax.plot(s[:, 0], s[:, 1], "-o", color="black", markersize=0.5)
 
     def plot_obs_area(self):
         obs_area = self.peds.obs_area
         for i, area in enumerate(obs_area):
 
             x_min, x_max, y_min, y_max, scalr = area
-            color = "red"
+            if scalr > 1.0:
+                color = "blue"
+            elif scalr < 1.0:
+                color = "red"
+            else:
+                color = "none"
             alpha = 0.3 # 透明度
 
             rect = Rectangle(

@@ -132,15 +132,18 @@ class PedState:
         next_state[:, 0:2] += desired_velocity * step_width_expanded
         next_state[:, 2:4] = desired_velocity
 
+        # ゴール到達判定と更新
         if self.waypoints is not None:
-            # ゴール到達判定
-            distances_to_goal = np.linalg.norm(next_state[:, 0:2] - next_state[:, 4:6], axis=-1)
-            reached_goal = distances_to_goal < 0.5  # 距離が0.5未満で到達と判定
+            for i, waypoints in enumerate(self.waypoints):
+                # ゴールに到達したか判定
+                current_pos = next_state[i, 0:2]
+                current_goal = next_state[i, 4:6]
+                distance_to_goal = np.linalg.norm(current_pos - current_goal)
 
-            # ゴールを更新
-            for i, reached in enumerate(reached_goal):
-                if reached and len(self.waypoints[i]) > 0:  # 中継地点が残っている場合
-                    next_state[i, 4:6] = self.waypoints[i].pop(0)  # 次のゴールに設定
+                # ゴールに到達した場合、次の中継地点を設定
+                if distance_to_goal < 0.5:  # 到達判定のしきい値
+                    if waypoints:  # 中継地点が残っている場合
+                        next_state[i, 4:6] = waypoints.pop(0)  # 次の目的地に設定
         
         next_groups = self.groups
         if groups is not None:
