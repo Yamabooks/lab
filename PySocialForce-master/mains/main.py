@@ -14,10 +14,10 @@ def initialize_pedestrians(num_pedestrians=300):
     :return: 初期状態 (state), 歩行者タイプ (types)
     """
     # スタート位置候補
-    start_positions = [[0, 8], [7, 50], [12.5, 0], [25, 2.5], [50, 31], [50, 12]]
+    start_positions = [[0, 8], [7, 50], [12.5, 0], [25, 0],[40, 0], [50, 31], [50, 12]]
     
     # 初速度候補
-    initial_velocities = [[0.5, 0.5], [0.5, -0.5], [0.5, 0.5], [0.5, 0.5], [-0.5, -0.5], [-0.5, -0.5]]
+    initial_velocities = [[0.5, 0.5], [0.5, -0.5], [0.5, 0.5], [0.5, 0.5],[0, 0.5], [-0.5, -0.5], [-0.5, -0.5]]
 
     # 歩行者タイプの確率 (例: adult: 0.6, elderly: 0.3, child: 0.1)
     type_probabilities = [0.6, 0.3, 0.1]
@@ -266,7 +266,7 @@ if __name__ == "__main__":
         config_file=Path(__file__).resolve().parent.joinpath("main.toml"),
     )
     
-    s.step(300)
+    s.step(500)
 
     with psf.utils.plot.SceneVisualizer(s, "output/animation") as sv:
         sv.animate()
